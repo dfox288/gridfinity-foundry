@@ -225,7 +225,7 @@ function Library({ armed, onArm }: { armed: string | null; onArm: (f: string | n
               </svg>
               <span>{b.w}×{b.d}{community ? `×${b.h}` : ""}{b.warning ? " ⚠" : ""}</span>
               {community && <small className="lib-name">{b.name}</small>}
-              {community && canChange(b.owner) && (
+              {community && canChange(b.owner_id) && (
                 <span
                   className="lib-del"
                   title={t("Delete")}

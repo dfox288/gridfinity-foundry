@@ -8,7 +8,9 @@ import { loadProject, project, toProject, useStore } from "./store";
 const DRAFT = "gridfinity-studio-draft";
 
 export function App() {
-  const { tab, theme, lang, toasts, schema, me, set, toast } = useStore();
+  const { tab, theme, lang, toasts, schema, me, providers, set, toast } = useStore();
+  // a user with an @ came in through Google, the others through GitHub
+  const via = providers.find((p) => p.id === (me.user?.includes("@") ? "google" : "github")) ?? providers[0];
   const t = (en: string) => translate(lang, en);
 
   useEffect(() => {
@@ -16,6 +18,7 @@ export function App() {
     api.bins().then((bins) => set({ bins })).catch((e) => toast(`Bins: ${e.message}`, "error"));
     api.printers().then((printers) => set({ printers })).catch(() => {});
     api.me().then((me) => set({ me })).catch(() => {});
+    api.providers().then((providers) => set({ providers }));
     // the unsaved work of the last visit (this browser only)
     try {
       const d = JSON.parse(localStorage.getItem(DRAFT) ?? "null");
@@ -81,15 +84,19 @@ export function App() {
           {me.auth &&
             (me.user ? (
               <span className="account">
-                <span className="account-name" title={t("Signed in with GitHub")}>
+                <span className="account-name" title={me.user.includes("@") ? `${t("Signed in with Google")}: ${me.user}` : t("Signed in with GitHub")}>
                   {/^[\w-]+$/.test(me.user) && <img src={`https://github.com/${me.user}.png?size=40`} alt="" width={20} height={20} />}
-                  {me.user}
+                  {me.name ?? me.user}
                 </span>
-                <a href="/oauth2/sign_out?rd=/">{t("Sign out")}</a>
+                <a href={via?.signout ?? "/oauth2/sign_out?rd=/"}>{t("Sign out")}</a>
               </span>
             ) : (
               // same tab: the unsaved work waits in the draft (localStorage)
-              <a className="account signin" href="/oauth2/start?rd=/">{t("Sign in with GitHub")}</a>
+              <span className="account">
+                {(providers.length ? providers : [{ id: "github", start: "/oauth2/start?rd=/", signout: "" }]).map((p) => (
+                  <a key={p.id} className="signin" href={p.start}>{t(p.id === "google" ? "Sign in with Google" : "Sign in with GitHub")}</a>
+                ))}
+              </span>
             ))}
           <div className="seg small lang">
             {(["de", "en"] as const).map((l) => (

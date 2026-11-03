@@ -88,7 +88,7 @@ export function PresetBar<T>({ kind, current, dirty, onLoad, getData, onNew }: {
                 <span>{p.name}</span>
                 <small>{new Date(p.updated).toLocaleString(useStore.getState().lang)}{p.owner ? ` · ${p.owner}` : ""}</small>
               </button>
-              {canChange(p.owner) && <button
+              {canChange(p.owner_id) && <button
                 className="item-del"
                 title={t("Delete")}
                 onClick={async () => {

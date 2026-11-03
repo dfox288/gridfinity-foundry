@@ -140,6 +140,8 @@ const DE: Record<string, string> = {
   "more": "mehr",
   "Taller bins are made when first needed (about a second each)": "Höhere Boxen werden beim ersten Gebrauch erzeugt (etwa eine Sekunde pro Box)",
   "Sign in with GitHub": "Mit GitHub anmelden",
+  "Sign in with Google": "Mit Google anmelden",
+  "Signed in with Google": "Mit Google angemeldet",
   "Sign out": "Abmelden",
   "Signed in with GitHub": "Mit GitHub angemeldet",
   "Sign in with GitHub (top right) to save or upload": "Zum Speichern oder Hochladen mit GitHub anmelden (oben rechts)",

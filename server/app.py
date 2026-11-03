@@ -7,8 +7,9 @@ keeps presets, builds print zips, and serves the web app.
   GET  /api/bins                       the labels and the uploaded bins (system "community")
   POST /api/uploads    STL bytes        upload a bin (headers X-Name, X-Creator, X-Filename, URL-encoded) -> its entry
   DELETE /api/uploads/<id>              remove an uploaded bin (its owner or an admin)
-  GET  /api/me                         {auth, user, admin, admins}: whether sign-in is on, and who is calling (behind
-                                       oauth2-proxy: a plain 401 when signed out)
+  GET  /api/me                         {auth, user, id, name, admin, admins}: whether sign-in is on, and who is calling
+                                       (behind oauth2-proxy: a plain 401 when signed out)
+  GET  /api/auth                       {auth, providers: [{id, start, signout}]}: the sign-in buttons (public)
   GET  /files/bins/<path>              one bin or part STL ("labels/..." for the labels); catalog files are rendered on the
                                        first request and cached (BINS_DIR may hold some of them ready-made)
   GET  /api/presets/<kind>             presets of a kind (plate, layout): [{name, updated}]
@@ -23,12 +24,15 @@ keeps presets, builds print zips, and serves the web app.
   everything else                      the web app (WEB_DIR, index.html for unknown paths)
 
 Environment: GRIDFLOCK_DIR, BINS_DIR, DATA_DIR (presets), CACHE_DIR (plate STLs), WEB_DIR, OPENSCAD, PORT, RENDER_JOBS,
-USER_HEADER, ADMINS.
+USER_HEADER, ADMINS, AUTH_PROVIDERS.
 
 Sign-in (2026-11-03): the server has no login of its own. With USER_HEADER set (e.g. X-Auth-Request-User,
 filled by oauth2-proxy with the GitHub login in front of the write routes), every write needs that header, and uploads
 and presets remember their owner: only the owner or one of ADMINS (comma-separated logins) may delete them or overwrite
-a preset. Without USER_HEADER (a local install) everything is open as before.
+a preset. Without USER_HEADER (a local install) everything is open as before. The user is a GitHub login or an email
+(Google); emails are never shown: lists carry owner_id (a short hash) and a display name instead of the owner.
+AUTH_PROVIDERS gives the sign-in buttons: provider=oauth2-proxy prefix, e.g. "github=/oauth2,google=/oauth2-google"
+(start: <prefix>/start?rd=/, sign out: <prefix>/sign_out?rd=/); a user with an @ is the google one.
 """
 import hashlib, io, json, os, re, subprocess, tempfile, threading, time, zipfile
 
@@ -53,6 +57,24 @@ OPENSCAD = os.environ.get("OPENSCAD", "openscad")
 PORT = int(os.environ.get("PORT", "8080"))
 USER_HEADER = os.environ.get("USER_HEADER", "").strip()
 ADMINS = {a.strip().lower() for a in os.environ.get("ADMINS", "").split(",") if a.strip()}
+AUTH_PROVIDERS = [{"id": i.strip(), "start": f"{x.strip()}/start?rd=/", "signout": f"{x.strip()}/sign_out?rd=/"}
+                  for i, x in (p.split("=", 1) for p in os.environ.get("AUTH_PROVIDERS", "github=/oauth2" if USER_HEADER else "").split(",") if "=" in p)]
+
+
+def owner_id(owner):
+    """an owner as lists show it: a short hash, so an email never leaves the server"""
+    return hashlib.sha256(owner.strip().lower().encode()).hexdigest()[:12] if owner else ""
+
+
+def display_name(owner):
+    """a GitHub login as it is, an email as the part before the @ (and before a +tag)"""
+    return (owner or "").split("@")[0].split("+")[0] if "@" in (owner or "") else (owner or "")
+
+
+def public_owner(entry):
+    """an entry with its owner replaced by owner_id and owner (the display name)"""
+    o = entry.get("owner") or ""
+    return {**entry, "owner": display_name(o), "owner_id": owner_id(o)}
 
 
 class Forbidden(Exception):
@@ -191,7 +213,7 @@ def bins():
         for f in sorted(LABELS.rglob("*.stl")):
             if not f.name.startswith("print-divider-tab-"):   # catalog
                 out.append(part_entry("labels/" + f.relative_to(LABELS).as_posix(), f))
-    return out + uploads.entries(UPLOADS)
+    return out + [public_owner(e) for e in uploads.entries(UPLOADS)]
 
 
 def safe_name(name):
@@ -217,7 +239,7 @@ def list_presets(kind):
     for f in sorted(d.glob("*.json")):
         try:
             p = json.loads(f.read_text())
-            out.append({"name": p.get("name", f.stem), "updated": p.get("updated", 0), "owner": p.get("owner", "")})
+            out.append(public_owner({"name": p.get("name", f.stem), "updated": p.get("updated", 0), "owner": p.get("owner", "")}))
         except (OSError, ValueError):
             pass
     return sorted(out, key=lambda p: -p["updated"])
@@ -358,7 +380,7 @@ class Handler(SimpleHTTPRequestHandler):
         """the signed-in user (from USER_HEADER), or None when sign-in is off"""
         if not USER_HEADER:
             return None
-        return re.sub(r"[^\w.@-]", "", self.headers.get(USER_HEADER) or "")[:80]
+        return re.sub(r"[^\w.@+-]", "", self.headers.get(USER_HEADER) or "")[:120]
 
     def route(self, method):
         path = unquote(urlparse(self.path).path)
@@ -368,7 +390,8 @@ class Handler(SimpleHTTPRequestHandler):
             if write and user == "":
                 return self.send_json({"error": "sign in to save or upload"}, 401)
             if path == "/api/me" and method == "GET":
-                return self.send_json({"auth": bool(USER_HEADER), "user": user or None,
+                return self.send_json({"auth": bool(USER_HEADER), "user": user or None, "id": owner_id(user or ""),
+                                       "name": display_name(user) or None,
                                        "admin": bool(user) and user.lower() in ADMINS, "admins": sorted(ADMINS)})
             if path == "/api/schema" and method == "GET":
                 return self.send_json(schema())
@@ -380,6 +403,8 @@ class Handler(SimpleHTTPRequestHandler):
             if path == "/api/printers" and method == "GET":
                 ps = bbl_profiles.printers() if bbl_profiles.ROOT.is_dir() else []
                 return self.send_json([{**p, "template": (bbl_profiles.TEMPLATES / f"{p['id']}.json").is_file()} for p in ps])
+            if path == "/api/auth" and method == "GET":
+                return self.send_json({"auth": bool(USER_HEADER), "providers": AUTH_PROVIDERS})
             if path == "/api/catalog" and method == "GET":
                 return self.send_json(catalog.catalog())
             if path == "/api/bins" and method == "GET":
@@ -390,8 +415,8 @@ class Handler(SimpleHTTPRequestHandler):
                     return self.send_json({"error": "file too large (max 60 MB)"}, 413)
                 data = self.rfile.read(n)
                 h = lambda k: unquote(self.headers.get(k) or "")   # noqa: E731
-                meta = uploads.save(UPLOADS, data, h("X-Name"), h("X-Creator") or user or "", h("X-Filename"), owner=user or "")
-                return self.send_json(next(e for e in uploads.entries(UPLOADS) if e["file"] == f"uploads/{meta['id']}.stl"))
+                meta = uploads.save(UPLOADS, data, h("X-Name"), h("X-Creator") or display_name(user), h("X-Filename"), owner=user or "")
+                return self.send_json(public_owner(next(e for e in uploads.entries(UPLOADS) if e["file"] == f"uploads/{meta['id']}.stl")))
             if (m := re.fullmatch(r"/api/uploads/([0-9a-f]{12})", path)) and method == "DELETE":
                 meta = uploads.meta(UPLOADS, m[1])
                 if meta and not may_change(user, meta.get("owner")):
@@ -411,10 +436,10 @@ class Handler(SimpleHTTPRequestHandler):
                     return self.send_json(list_presets(kind))
                 f = preset_path(kind, name)
                 if method == "GET":
-                    return self.send_json(json.loads(f.read_text())) if f.exists() else self.send_json({"error": "not found"}, 404)
+                    return self.send_json(public_owner(json.loads(f.read_text()))) if f.exists() else self.send_json({"error": "not found"}, 404)
                 old = json.loads(f.read_text()) if f.exists() and method in ("PUT", "DELETE") else None
                 if old and not may_change(user, old.get("owner")):
-                    raise Forbidden(f"“{old.get('name', name)}” belongs to {old.get('owner')}; save it under another name")
+                    raise Forbidden(f"“{old.get('name', name)}” belongs to {display_name(old.get('owner'))}; save it under another name")
                 if method == "PUT":
                     f.parent.mkdir(parents=True, exist_ok=True)
                     tmp = f.with_suffix(".tmp")
