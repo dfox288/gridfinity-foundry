@@ -1,0 +1,15 @@
+# docker compose up -d --build   ->  http://localhost:8742
+# --build-arg FULL_LIBRARY=1 (docker compose build --build-arg FULL_LIBRARY=1) renders every bin size instead of the
+# starter set (a few minutes). STUDIO_BIND=0.0.0.0 to reach it from other machines on the LAN.
+# STUDIO_UID / STUDIO_GID: the owner of the files it writes (presets, uploads) on Linux: `id -u`, `id -g`.
+services:
+  studio:
+    build: .
+    image: gridfinity-foundry
+    user: "${STUDIO_UID:-1000}:${STUDIO_GID:-1000}"
+    ports:
+      - "${STUDIO_BIND:-127.0.0.1}:${STUDIO_PORT:-8742}:8080"
+    volumes:
+      - ./presets:/data/presets                # saved presets
+      - ./uploads:/data/uploads                # bins uploaded in the app
+    restart: unless-stopped

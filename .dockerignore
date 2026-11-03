@@ -1,0 +1,7 @@
+.tmp
+web/node_modules
+web/dist
+presets
+uploads
+out
+compose.override.yaml
