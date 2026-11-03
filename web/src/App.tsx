@@ -85,7 +85,12 @@ export function App() {
             (me.user ? (
               <span className="account">
                 <span className="account-name" title={me.user.includes("@") ? `${t("Signed in with Google")}: ${me.user}` : t("Signed in with GitHub")}>
-                  {/^[\w-]+$/.test(me.user) && <img src={`https://github.com/${me.user}.png?size=40`} alt="" width={20} height={20} />}
+                  {me.user.includes("@") ? (
+                    // Google gives no picture in the header: the first letter instead
+                    <span className="avatar-letter">{(me.name ?? me.user).charAt(0).toUpperCase()}</span>
+                  ) : (
+                    <img src={`https://github.com/${me.user}.png?size=40`} alt="" width={20} height={20} onError={(e) => (e.currentTarget.style.display = "none")} />
+                  )}
                   {me.name ?? me.user}
                 </span>
                 <a href={via?.signout ?? "/oauth2/sign_out?rd=/"}>{t("Sign out")}</a>
