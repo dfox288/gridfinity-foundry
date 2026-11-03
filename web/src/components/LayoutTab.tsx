@@ -14,7 +14,7 @@ import { ParamPanel } from "./ParamPanel";
 import { PlateMesh, plateLayout } from "./PlateMesh";
 import { useT } from "../lib/i18n";
 import { creatorName, uploadBins } from "../lib/upload";
-import { addPart, partName, PartRows, PartsLibrary } from "./Parts";
+import { addPart, PART_DEFAULT, partName, PartRows, PartsLibrary } from "./Parts";
 import { PresetBar } from "./PresetBar";
 import { PrinterPicker } from "./PrinterPicker";
 import { fitView, Scene, type Controls } from "./Scene";
@@ -398,6 +398,7 @@ export function LayoutTab() {
                     parts: allParts.map((p) => ({ file: p.file, count: p.count, filament: fn(p.filament[0]), color: p.filament[1] })),
                     plate: null,
                     plates: plates.map((pl) => ({ ...pl, filament: fn(pl.filament) })),
+                    labels: engraved.map((l) => ({ ...l, filament: fn(labelFilament[0]), color: labelFilament[1] })),
                   });
                   download(r.blob, fileName(layoutPreset, "layout", split ? "zip" : "3mf", split ? "bambu-plates" : ""));
                   toast(t("Bambu Studio project: {n} plates", { n: r.plates }));
@@ -438,6 +439,23 @@ export function LayoutTab() {
       }
     return [...m.values()];
   }, [inScope]);
+  // engraved flex labels for the labelled flex bins: one each, text as on the bin (fit 0 for 1-wide, 0.2 wider)
+  const [engrave, setEngrave] = useState(true);
+  const engraved = useMemo(() => {
+    const m = new Map<string, { w: number; fit: number; text: string; count: number }>();
+    if (!engrave) return [];
+    for (const d of inScope)
+      for (const b of d.layout.bins) {
+        const info = lib.get(b.file);
+        if (!b.label || info?.system !== "flex") continue;
+        const fit = info.w <= 1 ? 0 : 0.2;
+        const k = `${info.w}|${fit}|${b.label}`;
+        const e = m.get(k);
+        m.set(k, e ? { ...e, count: e.count + 1 } : { w: info.w, fit, text: b.label, count: 1 });
+      }
+    return [...m.values()];
+  }, [inScope, lib, engrave]);
+  const labelFilament = PART_DEFAULT;
   const plates = inScope.map((d) => ({
     params: d.layout.plate as Record<string, ParamValue>,
     filament: (d.layout.plateFilament ?? PLATE_DEFAULT)[0],
@@ -803,6 +821,20 @@ export function LayoutTab() {
                 </div>
               ))
             )}
+            {inScope.some((d) => d.layout.bins.some((b) => b.label && lib.get(b.file)?.system === "flex")) && (
+              <label className="labels-toggle">
+                <input type="checkbox" checked={engrave} onChange={(e) => setEngrave(e.target.checked)} /> {t("Print flex labels with the text engraved")}
+              </label>
+            )}
+            {engraved.map((l) => (
+              <div key={`${l.w}|${l.fit}|${l.text}`} className="bom-row">
+                <span className="dot" style={{ background: labelFilament[1] }} />
+                <span className="bom-name">
+                  {t("Flex label")} {l.w} · „{l.text}“<small>fit {l.fit} · {fn(labelFilament[0])}</small>
+                </span>
+                <b>{l.count}×</b>
+              </div>
+            ))}
             {scope === "all" ? (
               inScope.map((d) => {
                 const sz = (d.layout.plate.plate_size as number[] | undefined) ?? size;
@@ -849,10 +881,10 @@ export function LayoutTab() {
               <button className="ghost small" onClick={redo} disabled={!useStore.getState().future.length}>↷ {t("Redo")}</button>
               <button className="ghost small danger" disabled={!layout.bins.length} onClick={() => confirm(t("Remove all bins?")) && editBins(() => [])}>{t("Clear")}</button>
             </div>
-            <button className="primary" disabled={busy || (!bom.length && !allParts.length)} onClick={() => exportBambu(false)}>
+            <button className="primary" disabled={busy || (!bom.length && !allParts.length && !engraved.length)} onClick={() => exportBambu(false)}>
               {busy ? t("Packing…") : t("Bambu project, all plates (.3mf)")}
             </button>
-            <button className="ghost" disabled={busy || (!bom.length && !allParts.length)} onClick={() => exportBambu(true)}>
+            <button className="ghost" disabled={busy || (!bom.length && !allParts.length && !engraved.length)} onClick={() => exportBambu(true)}>
               {t("Bambu: one file per plate (.zip)")}
             </button>
             <button
@@ -862,7 +894,7 @@ export function LayoutTab() {
                 setBusy(true);
                 try {
                   const name = layoutPreset ?? "layout";
-                  const blob = await api.zip({ name, bins: zipBins, parts: allParts.map((p) => ({ file: p.file, count: p.count })), plate: null, plates: plates.map((pl) => ({ params: pl.params, label: pl.label })) });
+                  const blob = await api.zip({ name, bins: zipBins, parts: allParts.map((p) => ({ file: p.file, count: p.count })), labels: engraved, plate: null, plates: plates.map((pl) => ({ params: pl.params, label: pl.label })) });
                   download(blob, fileName(layoutPreset, "layout", "zip", "stl"));
                 } catch (e) {
                   toast((e as Error).message, "error");

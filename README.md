@@ -18,6 +18,8 @@ onto it, and download everything as STL files or as a Bambu Studio project with 
   drawers at once. The print list and the downloads cover one drawer or all of them, with a baseplate per drawer.
 - **Your own bins**: drop any Gridfinity STL onto the plate (or into the Community section). It is centred, measured
   against the grid and added to the library on the server with your name, for everyone using that installation.
+- **Engraved labels**: every labelled flex bin gets its flex label with the text engraved (sized to fit), in the print
+  list and in the downloads.
 - **Dividers and labels** from the default library can be added to the print list (with "+ Dividers" / "+ Label" on a
   bin, or from the parts list).
 - **Downloads**: a print list with counts and filaments; a zip of all STL files; a Bambu Studio project (.3mf) with every

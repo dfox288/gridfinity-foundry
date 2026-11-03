@@ -136,6 +136,7 @@ const DE: Record<string, string> = {
   "approximate; measure (MALM generations differ)": "ungefähr; nachmessen (MALM-Generationen unterscheiden sich)",
   "Label, e.g. M3 screws": "Beschriftung, z. B. M3-Schrauben",
   "Show labels on the bins": "Beschriftungen auf den Boxen zeigen",
+  "Print flex labels with the text engraved": "Flex-Etiketten mit eingraviertem Text drucken",
   // parts
   Divider: "Trenner",
   "Tab divider": "Trenner mit Lasche",

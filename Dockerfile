@@ -39,6 +39,7 @@ RUN if [ "$FULL_LIBRARY" = "1" ]; then python3 /gen/gen_library.py /library && r
 FROM openscad/openscad:trixie.2026-10-26
 RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
 COPY server/ /app/server/
+COPY generator/scad/ /app/generator/scad/
 COPY templates/ /app/templates/
 COPY --from=gridflock /gridflock /opt/gridflock
 # GridFlock's build turns puzzle.svg into paths/puzzle.scad with svgelements; server/svg_paths.py does the same without it

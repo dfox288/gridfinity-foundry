@@ -101,7 +101,7 @@ export const api = {
   deletePreset: (kind: PresetKind, name: string) =>
     fetch(`/api/presets/${kind}/${encodeURIComponent(name)}`, { method: "DELETE" }).then((r) => json(r)),
 
-  async zip(req: { name: string; bins: { file: string; count: number }[]; parts: { file: string; count: number }[]; plates?: { params: Record<string, ParamValue>; label: string }[]; plate: { params: Record<string, ParamValue> } | null }) {
+  async zip(req: { name: string; bins: { file: string; count: number }[]; parts: { file: string; count: number }[]; labels?: { w: number; fit: number; text: string; count: number }[]; plates?: { params: Record<string, ParamValue>; label: string }[]; plate: { params: Record<string, ParamValue> } | null }) {
     const r = await fetch("/api/zip", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -119,6 +119,7 @@ export interface BambuRequest {
   parts: { file: string; count: number; filament: string; color: string }[];
   plate: { params: Record<string, ParamValue>; filament: string; color: string } | null;
   plates?: { params: Record<string, ParamValue>; filament: string; color: string; label: string }[];
+  labels?: { w: number; fit: number; text: string; count: number; filament: string; color: string }[];
   split?: boolean;   // one single-plate 3MF per plate, in a zip
 }
 

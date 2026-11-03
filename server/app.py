@@ -10,9 +10,11 @@ keeps presets, builds print zips, and serves the web app.
   GET  /files/bins/<path>              one bin or part STL ("labels/..." for the labels)
   GET  /api/presets/<kind>             presets of a kind (plate, layout): [{name, updated}]
   GET|PUT|DELETE /api/presets/<kind>/<name>
-  POST /api/zip        {name, bins: [{file, count}], parts: [{file, count}], plate: {params} | null, plates: [{params, label}]}
+  POST /api/zip        {name, bins: [{file, count}], parts: [{file, count}], labels: [{w, fit, text, count}], plate: {params} | null,
+                        plates: [{params, label}]}
   GET  /api/printers                   Bambu printers (system profiles): [{id, model, nozzle, bed, extruders}]
-  POST /api/bambu      {name, printer, bins: [{file, count, filament, color}], parts: [...], plate: {params, filament, color} | null,
+  POST /api/bambu      {name, printer, bins: [{file, count, filament, color}], parts: [...], labels: [{w, fit, text, count, filament, color}],
+                        plate: {params, filament, color} | null,
                         plates: [{params, filament, color, label}] (one per drawer), split}
                        a Bambu Studio project: parts packed on plates, a filament slot per colour (server/bambu3mf.py)
   everything else                      the web app (WEB_DIR, index.html for unknown paths)
@@ -35,6 +37,7 @@ LABELS = Path(os.environ.get("LABELS_DIR", "/labels")).resolve()   # gridfinity-
 DATA = Path(os.environ.get("DATA_DIR", "/data")).resolve()
 WEB = Path(os.environ.get("WEB_DIR", "/app/web")).resolve()
 CACHE = Path(os.environ.get("CACHE_DIR", str(DATA / "cache"))).resolve()
+GEN_SCAD = Path(os.environ.get("GENERATOR_SCAD", "/app/generator/scad")).resolve()   # flex_label.scad (engraved labels)
 UPLOADS = Path(os.environ.get("UPLOADS_DIR", str(DATA / "uploads"))).resolve()   # bins uploaded by users (server/uploads.py)
 OPENSCAD = os.environ.get("OPENSCAD", "openscad")
 PORT = int(os.environ.get("PORT", "8080"))
@@ -140,6 +143,26 @@ def part_entry(rel, f):
     return {"file": rel, "type": "part", "category": f.parent.name, "name": f.stem, "bytes": f.stat().st_size}
 
 
+def render_label(w, fit, text):
+    """a flex label for a bin w cells wide, pressing fit / 2 on each side wall, with `text` engraved; cached"""
+    text = re.sub(r'["\\\x00-\x1f]', "", str(text)).strip()[:30]
+    w, fit = float(w), float(fit)
+    if not text or not 0.5 <= w <= 8 or not 0 <= fit <= 1:
+        raise ValueError("bad label")
+    # as large as fits with a margin: the label face is about 42 w - 8 mm wide, DejaVu Sans about 0.62 x the size per
+    # character (0.7 here, for the margin)
+    size = round(min(6.0, (42 * w - 14) / (0.7 * max(len(text), 1))), 2)
+    args = ["-D", 'part="label"', "-D", f"cells_x={w:g}", "-D", f"fit={fit:g}", "-D", f"txt={json.dumps(text)}", "-D", f"txt_size={size}"]
+    key = hashlib.sha256(json.dumps(["label", args]).encode()).hexdigest()[:24]
+    CACHE.mkdir(parents=True, exist_ok=True)
+    out = CACHE / f"label-{key}.stl"
+    if not out.exists():
+        tmp = CACHE / f"label-{key}.{threading.get_ident()}.tmp.stl"
+        openscad(["--export-format", "binstl", *args, "-o", str(tmp), "flex_label.scad"], cwd=GEN_SCAD)
+        tmp.replace(out)
+    return out, text
+
+
 def bins():
     out = []
     if BINS.is_dir():
@@ -206,6 +229,12 @@ def build_zip(req):
                 count = int(b.get("count", 1))
                 z.write(f, f"{folder}/{count}x_{f.name}")
                 lines.append(f"| {count} | {folder}/{count}x_{f.name} |")
+        for lb in req.get("labels", []):
+            f, text = render_label(lb["w"], lb.get("fit", 0), lb["text"])
+            safe = re.sub(r"[^\w.-]+", "-", text).strip("-") or "label"
+            name = f"labels/{int(lb.get('count', 1))}x_flex-label-{float(lb['w']):g}_{safe}.stl"
+            z.write(f, name)
+            lines.append(f"| {int(lb.get('count', 1))} | {name} |")
         for pl in ([req["plate"]] if req.get("plate") else []) + list(req.get("plates") or []):
             plate, _ = render_plate(pl.get("params", {}))
             label = re.sub(r"[^\w.-]+", "-", pl.get("label") or "").strip("-")
@@ -243,6 +272,10 @@ def build_bambu(req):
         f = bin_file(b["file"])
         g = group(b.get("filament") or "PLA Basic · Jade White", b.get("color"), "parts")
         g["parts"] += [(f.stem.replace("print-", ""), *mesh(f))] * int(b.get("count", 1))
+    for lb in req.get("labels", []):
+        f, text = render_label(lb["w"], lb.get("fit", 0), lb["text"])
+        g = group(lb.get("filament") or "PLA Basic · Jade White", lb.get("color"), "labels")
+        g["parts"] += [(f"label {text}", *bambu3mf.read_stl(f.read_bytes()))] * int(lb.get("count", 1))
     # one baseplate ("plate") or several, one per drawer ("plates", each with a label)
     for pl in ([req["plate"]] if req.get("plate") else []) + list(req.get("plates") or []):
         plate, _ = render_plate(pl.get("params", {}))
