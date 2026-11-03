@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { BinFile, Param, ParamValue, Printer } from "./api";
+import type { BinFile, Me, Param, ParamValue, Printer } from "./api";
 
 export type Tab = "plate" | "layout";
 export type ColorMode = "height" | "system" | "custom";
@@ -57,6 +57,7 @@ interface State {
   schema: Param[];
   bins: BinFile[];
   printers: Printer[];
+  me: Me;
   printer: string;    // Bambu printer preset: bed size and the Bambu project's settings
   plate: Record<string, ParamValue>;
   platePreset: string | null;
@@ -124,6 +125,7 @@ export const useStore = create<State>((set, get) => ({
   schema: [],
   bins: [],
   printers: [],
+  me: { auth: false, user: null, admin: false },
   printer: savedPrinter ?? "Bambu Lab P1S 0.6 nozzle",
   plate: {},
   platePreset: null,
@@ -194,3 +196,9 @@ export function value(over: Record<string, ParamValue>, schema: Param[], name: s
 
 // for poking at it from the browser console
 (window as unknown as { studio: typeof useStore }).studio = useStore;
+
+// may the current user delete or overwrite something owned by owner (an upload, a preset)
+export function canChange(owner?: string) {
+  const { me } = useStore.getState();
+  return !me.auth || me.admin || (!!me.user && (owner ?? "").toLowerCase() === me.user.toLowerCase());
+}

@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { api, bambuProject, download, fileName, type BinFile, type ParamValue } from "../api";
 import { grid, PITCH, type Grid } from "../lib/grid";
 import { usePlate } from "../lib/usePlate";
-import { DEFAULT_LAYOUT, loadProject, newId, project, toProject, useStore, value, type Layout, type PartLine, type Placed } from "../store";
+import { canChange, DEFAULT_LAYOUT, loadProject, newId, project, toProject, useStore, value, type Layout, type PartLine, type Placed } from "../store";
 import { FURNITURE } from "../lib/furniture";
 import { DrawerTabs } from "./DrawerTabs";
 import { BAMBU, filamentName } from "../lib/bambu";
@@ -107,6 +107,7 @@ function SelectionFrame({ x, y, w, d, z, h }: { x: number; y: number; w: number;
 
 function Library({ armed, onArm }: { armed: string | null; onArm: (f: string | null) => void }) {
   const bins = useStore((s) => s.bins);
+  useStore((s) => s.me);   // re-render on sign-in (canChange)
   const t = useT();
   const [system, setSystem] = useState("flex");
   const [kind, setKind] = useState("hex");
@@ -222,7 +223,7 @@ function Library({ armed, onArm }: { armed: string | null; onArm: (f: string | n
               </svg>
               <span>{b.w}×{b.d}{community ? `×${b.h}` : ""}{b.warning ? " ⚠" : ""}</span>
               {community && <small className="lib-name">{b.name}</small>}
-              {community && (
+              {community && canChange(b.owner) && (
                 <span
                   className="lib-del"
                   title={t("Delete")}

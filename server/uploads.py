@@ -3,7 +3,7 @@
 Each upload is checked and normalised: the STL is read (binary or ASCII), moved so that its footprint is centred on the
 origin and its bottom is at z 0 (as our own bins), and written back as binary STL. The footprint in cells (42 mm, half
 cells allowed) and the height in units (7 mm) come from its size; a bin that does not fit the grid gets a warning but is
-kept. Stored as UPLOADS/<id>.stl with UPLOADS/<id>.json (name, creator, size, warning).
+kept. Stored as UPLOADS/<id>.stl with UPLOADS/<id>.json (name, creator, owner, size, warning).
 """
 import json
 import re
@@ -42,7 +42,7 @@ def write_stl(verts, faces):
     return bytes(out)
 
 
-def save(root: Path, data: bytes, name: str, creator: str, filename: str):
+def save(root: Path, data: bytes, name: str, creator: str, filename: str, owner: str = ""):
     if len(data) > MAX_BYTES:
         raise ValueError("file too large (max 60 MB)")
     if len(data) < 84:
@@ -60,6 +60,7 @@ def save(root: Path, data: bytes, name: str, creator: str, filename: str):
         "id": uuid.uuid4().hex[:12],
         "name": clean(name, 60) or clean(Path(filename or "bin").stem, 60) or "bin",
         "creator": clean(creator, 40),
+        "owner": owner,
         "filename": clean(filename, 120),
         "w": w, "d": d, "h": h,
         "size": [round(dx, 2), round(dy, 2), round(dz, 2)],
@@ -86,7 +87,7 @@ def entries(root: Path):
         stl = root / f"{m['id']}.stl"
         if stl.is_file():
             out.append({"file": f"uploads/{m['id']}.stl", "type": "bin", "system": "community", "kind": "custom",
-                        "w": m["w"], "d": m["d"], "h": m["h"], "name": m["name"], "creator": m.get("creator", ""),
+                        "w": m["w"], "d": m["d"], "h": m["h"], "name": m["name"], "creator": m.get("creator", ""), "owner": m.get("owner", ""),
                         "warning": m.get("warning", ""), "bytes": stl.stat().st_size, "created": m.get("created", 0)})
     return sorted(out, key=lambda e: -e["created"])
 

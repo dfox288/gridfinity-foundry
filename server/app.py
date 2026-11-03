@@ -6,10 +6,11 @@ keeps presets, builds print zips, and serves the web app.
   GET  /api/bins                       the bin library: every STL under BINS_DIR, with system, kind and size from its name,
                                        the labels, and the uploaded bins (system "community")
   POST /api/uploads    STL bytes        upload a bin (headers X-Name, X-Creator, X-Filename, URL-encoded) -> its entry
-  DELETE /api/uploads/<id>              remove an uploaded bin
+  DELETE /api/uploads/<id>              remove an uploaded bin (its owner or an admin)
+  GET  /api/me                         {auth, user, admin, admins}: whether sign-in is on, and who is calling
   GET  /files/bins/<path>              one bin or part STL ("labels/..." for the labels)
   GET  /api/presets/<kind>             presets of a kind (plate, layout): [{name, updated}]
-  GET|PUT|DELETE /api/presets/<kind>/<name>
+  GET|PUT|DELETE /api/presets/<kind>/<name>   (PUT over someone else's preset and DELETE: its owner or an admin)
   POST /api/zip        {name, bins: [{file, count}], parts: [{file, count}], labels: [{w, fit, text, count}], plate: {params} | null,
                         plates: [{params, label}]}
   GET  /api/printers                   Bambu printers (system profiles): [{id, model, nozzle, bed, extruders}]
@@ -19,7 +20,13 @@ keeps presets, builds print zips, and serves the web app.
                        a Bambu Studio project: parts packed on plates, a filament slot per colour (server/bambu3mf.py)
   everything else                      the web app (WEB_DIR, index.html for unknown paths)
 
-Environment: GRIDFLOCK_DIR, BINS_DIR, DATA_DIR (presets), CACHE_DIR (plate STLs), WEB_DIR, OPENSCAD, PORT, RENDER_JOBS.
+Environment: GRIDFLOCK_DIR, BINS_DIR, DATA_DIR (presets), CACHE_DIR (plate STLs), WEB_DIR, OPENSCAD, PORT, RENDER_JOBS,
+USER_HEADER, ADMINS.
+
+Sign-in (2026-11-03): the server has no login of its own. With USER_HEADER set (e.g. X-Auth-Request-User,
+filled by oauth2-proxy with the GitHub login in front of the write routes), every write needs that header, and uploads
+and presets remember their owner: only the owner or one of ADMINS (comma-separated logins) may delete them or overwrite
+a preset. Without USER_HEADER (a local install) everything is open as before.
 """
 import hashlib, io, json, os, re, subprocess, tempfile, threading, time, zipfile
 
@@ -41,6 +48,17 @@ GEN_SCAD = Path(os.environ.get("GENERATOR_SCAD", "/app/generator/scad")).resolve
 UPLOADS = Path(os.environ.get("UPLOADS_DIR", str(DATA / "uploads"))).resolve()   # bins uploaded by users (server/uploads.py)
 OPENSCAD = os.environ.get("OPENSCAD", "openscad")
 PORT = int(os.environ.get("PORT", "8080"))
+USER_HEADER = os.environ.get("USER_HEADER", "").strip()
+ADMINS = {a.strip().lower() for a in os.environ.get("ADMINS", "").split(",") if a.strip()}
+
+
+class Forbidden(Exception):
+    pass
+
+
+def may_change(user, owner):
+    """user may delete or overwrite something owned by owner (None: sign-in is off)"""
+    return user is None or user.lower() in ADMINS or (owner or "").lower() == user.lower()
 JOBS = threading.Semaphore(int(os.environ.get("RENDER_JOBS", str(os.cpu_count() or 2))))
 CACHE_MAX = 400              # plate STLs kept in DATA/cache
 KINDS = ("plate", "layout")
@@ -203,7 +221,7 @@ def list_presets(kind):
     for f in sorted(d.glob("*.json")):
         try:
             p = json.loads(f.read_text())
-            out.append({"name": p.get("name", f.stem), "updated": p.get("updated", 0)})
+            out.append({"name": p.get("name", f.stem), "updated": p.get("updated", 0), "owner": p.get("owner", "")})
         except (OSError, ValueError):
             pass
     return sorted(out, key=lambda p: -p["updated"])
@@ -332,9 +350,22 @@ class Handler(SimpleHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}") if n < 2_000_000 else {}
 
+    def user(self):
+        """the signed-in user (from USER_HEADER), or None when sign-in is off"""
+        if not USER_HEADER:
+            return None
+        return re.sub(r"[^\w.@-]", "", self.headers.get(USER_HEADER) or "")[:80]
+
     def route(self, method):
         path = unquote(urlparse(self.path).path)
         try:
+            user = self.user()
+            write = method in ("PUT", "DELETE") or (method == "POST" and path == "/api/uploads")
+            if write and user == "":
+                return self.send_json({"error": "sign in to save or upload"}, 401)
+            if path == "/api/me" and method == "GET":
+                return self.send_json({"auth": bool(USER_HEADER), "user": user or None,
+                                       "admin": bool(user) and user.lower() in ADMINS, "admins": sorted(ADMINS)})
             if path == "/api/schema" and method == "GET":
                 return self.send_json(schema())
             if path == "/api/plate" and method == "POST":
@@ -353,9 +384,12 @@ class Handler(SimpleHTTPRequestHandler):
                     return self.send_json({"error": "file too large (max 60 MB)"}, 413)
                 data = self.rfile.read(n)
                 h = lambda k: unquote(self.headers.get(k) or "")   # noqa: E731
-                meta = uploads.save(UPLOADS, data, h("X-Name"), h("X-Creator"), h("X-Filename"))
+                meta = uploads.save(UPLOADS, data, h("X-Name"), h("X-Creator") or user or "", h("X-Filename"), owner=user or "")
                 return self.send_json(next(e for e in uploads.entries(UPLOADS) if e["file"] == f"uploads/{meta['id']}.stl"))
             if (m := re.fullmatch(r"/api/uploads/([0-9a-f]{12})", path)) and method == "DELETE":
+                meta = uploads.meta(UPLOADS, m[1])
+                if meta and not may_change(user, meta.get("owner")):
+                    raise Forbidden("only its owner can delete this bin")
                 uploads.delete(UPLOADS, m[1])
                 return self.send_json({"ok": True})
             if path.startswith("/files/bins/") and method == "GET":
@@ -372,10 +406,15 @@ class Handler(SimpleHTTPRequestHandler):
                 f = preset_path(kind, name)
                 if method == "GET":
                     return self.send_json(json.loads(f.read_text())) if f.exists() else self.send_json({"error": "not found"}, 404)
+                old = json.loads(f.read_text()) if f.exists() and method in ("PUT", "DELETE") else None
+                if old and not may_change(user, old.get("owner")):
+                    raise Forbidden(f"“{old.get('name', name)}” belongs to {old.get('owner')}; save it under another name")
                 if method == "PUT":
                     f.parent.mkdir(parents=True, exist_ok=True)
                     tmp = f.with_suffix(".tmp")
-                    tmp.write_text(json.dumps({"name": safe_name(name), "updated": int(time.time() * 1000), "data": self.body().get("data")}, indent=1))
+                    owner = (old or {}).get("owner") or user or ""
+                    tmp.write_text(json.dumps({"name": safe_name(name), "owner": owner, "updated": int(time.time() * 1000),
+                                               "data": self.body().get("data")}, indent=1))
                     tmp.replace(f)
                     return self.send_json({"ok": True})
                 if method == "DELETE":
@@ -400,6 +439,8 @@ class Handler(SimpleHTTPRequestHandler):
             if not (WEB / path.lstrip("/")).is_file():
                 self.path = "/index.html"
             return super().do_GET()
+        except Forbidden as e:
+            return self.send_json({"error": str(e)}, 403)
         except ValueError as e:
             return self.send_json({"error": str(e)}, 400)
         except RuntimeError as e:

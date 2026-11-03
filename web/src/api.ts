@@ -1,4 +1,6 @@
 // The server's API (server/app.py)
+import { translate } from "./lib/i18n";
+import { useStore } from "./store";
 
 export type ParamValue = number | boolean | string | number[];
 
@@ -27,6 +29,7 @@ export interface BinFile {
   side?: string;
   name?: string;
   creator?: string;    // uploaded bins
+  owner?: string;      // uploaded bins: the GitHub login of the uploader (sign-in on)
   warning?: string;
   bytes: number;
 }
@@ -42,6 +45,14 @@ export interface Printer {
 export interface PresetInfo {
   name: string;
   updated: number;
+  owner?: string;
+}
+
+// sign-in (server/app.py USER_HEADER): auth is on when the server sits behind oauth2-proxy
+export interface Me {
+  auth: boolean;
+  user: string | null;
+  admin: boolean;
 }
 
 export type PresetKind = "plate" | "layout";
@@ -55,6 +66,7 @@ async function json<T>(r: Response): Promise<T> {
     } catch {
       /* not JSON */
     }
+    if (r.status === 401) msg = translate(useStore.getState().lang, "Sign in with GitHub (top right) to save or upload");
     throw new Error(msg);
   }
   return r.json();
@@ -64,6 +76,17 @@ export const api = {
   schema: () => fetch("/api/schema").then((r) => json<Param[]>(r)),
   bins: () => fetch("/api/bins").then((r) => json<BinFile[]>(r)),
   printers: () => fetch("/api/printers").then((r) => json<Printer[]>(r)),
+  // the public pages do not pass oauth2-proxy, so the name comes from its own /oauth2/userinfo (the session cookie)
+  async me(): Promise<Me> {
+    const me = await fetch("/api/me").then((r) => json<Me & { admins?: string[] }>(r));
+    if (me.auth && !me.user) {
+      const r = await fetch("/oauth2/userinfo", { headers: { Accept: "application/json" } }).catch(() => null);
+      const info = r?.ok && (r.headers.get("Content-Type") ?? "").includes("json") ? await r.json() : null;
+      me.user = info?.preferredUsername || info?.user || null;
+      me.admin = !!me.user && (me.admins ?? []).includes(me.user.toLowerCase());
+    }
+    return { auth: me.auth, user: me.user, admin: me.admin };
+  },
   upload: (file: File, name: string, creator: string) =>
     fetch("/api/uploads", {
       method: "POST",

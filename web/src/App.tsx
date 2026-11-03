@@ -8,13 +8,14 @@ import { loadProject, project, toProject, useStore } from "./store";
 const DRAFT = "gridfinity-studio-draft";
 
 export function App() {
-  const { tab, theme, lang, toasts, schema, set, toast } = useStore();
+  const { tab, theme, lang, toasts, schema, me, set, toast } = useStore();
   const t = (en: string) => translate(lang, en);
 
   useEffect(() => {
     api.schema().then((schema) => set({ schema })).catch((e) => toast(`Schema: ${e.message}`, "error"));
     api.bins().then((bins) => set({ bins })).catch((e) => toast(`Bins: ${e.message}`, "error"));
     api.printers().then((printers) => set({ printers })).catch(() => {});
+    api.me().then((me) => set({ me })).catch(() => {});
     // the unsaved work of the last visit (this browser only)
     try {
       const d = JSON.parse(localStorage.getItem(DRAFT) ?? "null");
@@ -77,6 +78,16 @@ export function App() {
           <span className="credit">
             {t("plates by")} <a href="https://github.com/yawkat/gridflock" target="_blank" rel="noreferrer">GridFlock</a>
           </span>
+          {me.auth &&
+            (me.user ? (
+              <span className="account">
+                <span className="account-name" title={t("Signed in with GitHub")}>{me.user}</span>
+                <a href="/oauth2/sign_out?rd=/">{t("Sign out")}</a>
+              </span>
+            ) : (
+              // same tab: the unsaved work waits in the draft (localStorage)
+              <a className="account signin" href="/oauth2/start?rd=/">{t("Sign in with GitHub")}</a>
+            ))}
           <div className="seg small lang">
             {(["de", "en"] as const).map((l) => (
               <button key={l} className={lang === l ? "on" : ""} onClick={() => set({ lang: l })}>{l.toUpperCase()}</button>

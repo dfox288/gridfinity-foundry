@@ -61,6 +61,10 @@ code, .num { font-family: "JetBrains Mono", ui-monospace, monospace; }
 .top-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .credit { color: var(--muted); font-size: 12px; }
 .credit a { color: var(--text); }
+.account { display: flex; gap: 8px; align-items: center; font-size: 12px; }
+.account a, a.account { color: var(--text); }
+.account-name { color: var(--muted); }
+a.signin { padding: 4px 10px; border: 1px solid var(--line-2); border-radius: 999px; text-decoration: none; }
 
 .icon-btn {
   width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px;

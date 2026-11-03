@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type PresetInfo, type PresetKind } from "../api";
 import { useT } from "../lib/i18n";
-import { useStore } from "../store";
+import { canChange, useStore } from "../store";
 
 // Saved presets of one kind on the server: pick one to load, save the current state under a name, delete
 export function PresetBar<T>({ kind, current, dirty, onLoad, getData, onNew }: {
@@ -13,6 +13,7 @@ export function PresetBar<T>({ kind, current, dirty, onLoad, getData, onNew }: {
   onNew: () => void;
 }) {
   const toast = useStore((s) => s.toast);
+  useStore((s) => s.me);   // re-render on sign-in (canChange)
   const t = useT();
   const [list, setList] = useState<PresetInfo[]>([]);
   const [open, setOpen] = useState(false);
@@ -85,9 +86,9 @@ export function PresetBar<T>({ kind, current, dirty, onLoad, getData, onNew }: {
                 }}
               >
                 <span>{p.name}</span>
-                <small>{new Date(p.updated).toLocaleString(useStore.getState().lang)}</small>
+                <small>{new Date(p.updated).toLocaleString(useStore.getState().lang)}{p.owner ? ` · ${p.owner}` : ""}</small>
               </button>
-              <button
+              {canChange(p.owner) && <button
                 className="item-del"
                 title={t("Delete")}
                 onClick={async () => {
@@ -97,7 +98,7 @@ export function PresetBar<T>({ kind, current, dirty, onLoad, getData, onNew }: {
                 }}
               >
                 ✕
-              </button>
+              </button>}
             </div>
           ))}
         </div>
