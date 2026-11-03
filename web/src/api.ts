@@ -69,7 +69,13 @@ async function json<T>(r: Response): Promise<T> {
     if (r.status === 401) msg = translate(useStore.getState().lang, "Sign in with GitHub (top right) to save or upload");
     throw new Error(msg);
   }
-  return r.json();
+  // an answer that is not ours (a proxy in front) says what it was instead of a bare JSON parse error
+  const text = await r.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`${r.status} ${r.headers.get("Content-Type") ?? ""}: ${text.slice(0, 80) || "empty answer"} (${r.url.replace(location.origin, "")})`);
+  }
 }
 
 export const api = {
