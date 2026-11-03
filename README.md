@@ -58,9 +58,9 @@ with dividers to match (`server/catalog.py`, about a second per bin the first ti
 joints between cells with a groove in the floor, so a loose divider slides in at every cell joint, and a honeycomb per
 cell. Two label systems:
 
-- **flex**: a groove all round the inside of the lip; a flex label springs into it when you want one, the bin stays
+- **groove**: a groove all round the inside of the lip; a flex label springs into it when you want one, the bin stays
   stackable.
-- **cullenect**: the [Cullenect V2](https://makerworld.com/en/models/446624) click-label socket on a shelf in one corner.
+- **click**: a socket on a shelf in one corner for [Cullenect V2](https://makerworld.com/en/models/446624) click labels.
 
 Dividers fit both. The labels in `library/labels/` (flex labels, corner labels with a tab divider, and lip plugs and glue
 labels for plain light bins) are still being tested.

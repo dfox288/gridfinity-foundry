@@ -99,7 +99,7 @@ const DE: Record<string, string> = {
   "No divider for this size": "Kein Trenner für diese Größe",
   "{n} dividers {d}×{h}U added": "{n} Trenner {d}×{h}U hinzugefügt",
   "1 divider {d}×{h}U added": "1 Trenner {d}×{h}U hinzugefügt",
-  "Cullenect labels come from MakerWorld (model 446624)": "Cullenect-Etiketten gibt es auf MakerWorld (Modell 446624)",
+  "Click labels (Cullenect) come from MakerWorld (model 446624)": "Click-Etiketten (Cullenect) gibt es auf MakerWorld (Modell 446624)",
   "No flex label for this width": "Kein Flex-Etikett für diese Breite",
   "Flex label {w} added": "Flex-Etikett {w} hinzugefügt",
   all: "alle",
@@ -160,8 +160,6 @@ const DE: Record<string, string> = {
   "For the old light bins without ribs or groove.": "Für die alten leichten Boxen ohne Rippen und Nut.",
   "With a corner label in bins 3+ cells wide.": "Zusammen mit einem Eck-Etikett in Boxen ab 3 Zellen Breite.",
   // bin kinds
-  flex: "Flex",
-  cullenect: "Cullenect",
   hex: "Waben",
   solid: "geschlossen",
 };

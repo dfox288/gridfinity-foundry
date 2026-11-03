@@ -174,11 +174,21 @@ export function project(): Project {
 }
 
 // a saved preset or draft: a project, or (older) a single layout
+// the bin variants were called flex and cullenect before they became groove and click (2026-11-04)
+export function binFile(f: string) {
+  return f.replace(/^flex\/print-bin-flex_/, "groove/print-bin-groove_").replace(/^cullenect\/print-bin-cullenect_/, "click/print-bin-click_");
+}
+
+function layoutOf(l: Partial<Layout>): Layout {
+  const x = { ...DEFAULT_LAYOUT, ...l };
+  return { ...x, bins: x.bins.map((b) => ({ ...b, file: binFile(b.file) })) };
+}
+
 export function toProject(data: unknown): Project {
   const d = data as Partial<Project> & Partial<Layout>;
   if (d && Array.isArray(d.drawers) && d.drawers.length)
-    return { version: 2, active: Math.min(d.active ?? 0, d.drawers.length - 1), drawers: d.drawers.map((x) => ({ ...x, layout: { ...DEFAULT_LAYOUT, ...x.layout } })) };
-  return { version: 2, active: 0, drawers: [{ id: newId(), name: "Drawer 1", layout: { ...DEFAULT_LAYOUT, ...(d as Layout) } }] };
+    return { version: 2, active: Math.min(d.active ?? 0, d.drawers.length - 1), drawers: d.drawers.map((x) => ({ ...x, layout: layoutOf(x.layout) })) };
+  return { version: 2, active: 0, drawers: [{ id: newId(), name: "Drawer 1", layout: layoutOf(d as Layout) }] };
 }
 
 export function loadProject(p: Project) {

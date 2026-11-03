@@ -28,7 +28,7 @@ const HEIGHT_COLORS: Record<number, [string, string]> = {
   11: ["#BECF00", "Bright Green"], 12: ["#FF6A13", "Orange"], 13: ["#F55A74", "Pink"], 14: ["#0056B8", "Cobalt Blue"],
   15: ["#3F8E43", "Mistletoe Green"], 16: ["#9D432C", "Brown"], 17: ["#482960", "Indigo Purple"], 18: ["#9D2235", "Maroon Red"],
 };
-const SYSTEM_COLORS: Record<string, [string, string]> = { flex: ["#0056B8", "Cobalt Blue"], cullenect: ["#FF6A13", "Orange"], community: ["#00AE42", "Bambu Green"] };
+const SYSTEM_COLORS: Record<string, [string, string]> = { groove: ["#0056B8", "Cobalt Blue"], click: ["#FF6A13", "Orange"], community: ["#00AE42", "Bambu Green"] };
 const PLATE_DEFAULT: [string, string] = ["PLA Basic · Gray", "#8E9089"];
 const SEAT = 4.4;   // a bin's bottom below the plate top
 
@@ -115,7 +115,7 @@ function Library({ armed, onArm }: { armed: string | null; onArm: (f: string | n
   const bins = useStore((s) => s.bins);
   useStore((s) => s.me);   // re-render on sign-in (canChange)
   const t = useT();
-  const [system, setSystem] = useState("flex");
+  const [system, setSystem] = useState("groove");
   const [kind, setKind] = useState("hex");
   const [h, setH] = useState(6);
   const [fw, setFw] = useState<number | null>(null);
@@ -450,7 +450,7 @@ export function LayoutTab() {
     for (const d of inScope)
       for (const b of d.layout.bins) {
         const info = lib.get(b.file);
-        if (!b.label || info?.system !== "flex") continue;
+        if (!b.label || info?.system !== "groove") continue;
         const fit = info.w <= 1 ? 0 : 0.2;
         const k = `${info.w}|${fit}|${b.label}`;
         const e = m.get(k);
@@ -485,7 +485,7 @@ export function LayoutTab() {
   };
   const addLabel = () => {
     if (!selInfo) return;
-    if (selInfo.system !== "flex") return toast(t("Cullenect labels come from MakerWorld (model 446624)"));
+    if (selInfo.system !== "groove") return toast(t("Click labels (Cullenect) come from MakerWorld (model 446624)"));
     const fit = selInfo.w <= 1 ? 0 : 0.2;   // 2026-11-03: 1-wide only fit 0 held, 2-wide fit 0.2
     const lab = partLib.find((p) => p.category === "Flex label" && p.w === selInfo.w && p.fit === fit);
     if (!lab) return toast(t("No flex label for this width"));
@@ -824,7 +824,7 @@ export function LayoutTab() {
                 </div>
               ))
             )}
-            {inScope.some((d) => d.layout.bins.some((b) => b.label && lib.get(b.file)?.system === "flex")) && (
+            {inScope.some((d) => d.layout.bins.some((b) => b.label && lib.get(b.file)?.system === "groove")) && (
               <label className="labels-toggle">
                 <input type="checkbox" checked={engrave} onChange={(e) => setEngrave(e.target.checked)} /> {t("Print flex labels with the text engraved")}
               </label>
