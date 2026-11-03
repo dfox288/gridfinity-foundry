@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useThree, type ThreeEvent } from "@react-three/fiber";
+import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import { api, bambuProject, download, fileName, type BinFile, type ParamValue } from "../api";
 import { grid, PITCH, type Grid } from "../lib/grid";
@@ -253,6 +254,7 @@ export function LayoutTab() {
   const fn = (f: string) => filamentName(f, lang);
   const [saved, setSaved] = useState(() => JSON.stringify(toProject(DEFAULT_LAYOUT).drawers.map((d) => d.layout)));
   const [scope, setScope] = useState<"drawer" | "all">("drawer");
+  const [showLabels, setShowLabels] = useState(true);
   const [armed, setArmed] = useState<string | null>(null);
   const [armedRot, setArmedRot] = useState<0 | 1>(0);
   const [hover, setHover] = useState<[number, number] | null>(null);
@@ -413,14 +415,15 @@ export function LayoutTab() {
     [scope, drawers, active, layout], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const bom = useMemo(() => {
-    const m = new Map<string, { file: string; count: number; info?: BinFile; color: string; filament: string }>();
+    const m = new Map<string, { file: string; count: number; info?: BinFile; color: string; filament: string; labels: string[] }>();
     for (const d of inScope)
       for (const b of d.layout.bins) {
         const info = lib.get(b.file);
         const [color, filament] = binColor(b, info, d.layout.colorMode);
         const k = `${b.file}|${color}`;
-        const e = m.get(k) ?? { file: b.file, count: 0, info, color, filament };
+        const e = m.get(k) ?? { file: b.file, count: 0, info, color, filament, labels: [] };
         e.count++;
+        if (b.label) e.labels.push(b.label);
         m.set(k, e);
       }
     return [...m.values()].sort((a, b) => b.count - a.count);
@@ -677,6 +680,20 @@ export function LayoutTab() {
             const [w, d] = fp(selInfo, sel.rot);
             return <SelectionFrame x={sel.x} y={sel.y} w={w} d={d} z={top - SEAT} h={7 * selInfo.h + 4} />;
           })()}
+          {showLabels &&
+            layout.bins.map((b) => {
+              const info = lib.get(b.file);
+              if (!b.label || !info || drag?.id === b.id) return null;
+              const [w] = fp(info, b.rot);
+              // on the front edge of the bin, at its top
+              return (
+                <Html key={`label-${b.id}`} position={[(b.x + w / 2) * PITCH, b.y * PITCH + 7, top - SEAT + 7 * info.h + 5]} center zIndexRange={[10, 0]} distanceFactor={420}>
+                  <div className={`bin-label ${b.id === selected ? "on" : ""}`} onPointerDown={(e) => e.stopPropagation()} onClick={() => set({ selected: b.id })}>
+                    {b.label}
+                  </div>
+                </Html>
+              );
+            })}
         </Scene>
         <ViewButtons onView={(view) => fitView(controls.current, frameBox, view)} name={layoutPreset} fallback="layout" />
         <DrawerTabs />
@@ -696,6 +713,19 @@ export function LayoutTab() {
                 <span>{t("Click a bin to colour, turn or copy it")}</span>
               )}
             </div>
+            <input
+              key={sel?.id ?? "none"}
+              className="label-input"
+              disabled={!sel}
+              placeholder={t("Label, e.g. M3 screws")}
+              defaultValue={sel?.label ?? ""}
+              maxLength={40}
+              onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                if (sel && v !== (sel.label ?? "")) editBins((b) => b.map((x) => (x.id === sel.id ? { ...x, label: v || undefined } : x)));
+              }}
+            />
             <div className="filament-row">
               <select value={material} disabled={!sel} onChange={(e) => setMaterial(e.target.value)}>
                 {Object.keys(BAMBU).map((m) => (
@@ -738,6 +768,9 @@ export function LayoutTab() {
                 <button className={scope === "all" ? "on" : ""} onClick={() => setScope("all")}>{t("All drawers")} ({drawers.length})</button>
               </div>
             )}
+            <label className="labels-toggle">
+              <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} /> {t("Show labels on the bins")}
+            </label>
             <div className="colour-by">
               <span>{t("Colour by")}</span>
               <div className="seg small">
@@ -747,12 +780,13 @@ export function LayoutTab() {
               </div>
             </div>
             {bom.length === 0 && allParts.length === 0 && <div className="empty">{t("No bins yet")}</div>}
-            {bom.map(({ file, count, info, color, filament }) => (
+            {bom.map(({ file, count, info, color, filament, labels }) => (
               <div key={`${file}|${color}`} className="bom-row">
                 <span className="dot" style={{ background: color }} />
                 <span className="bom-name">
                   {info ? `${info.name ? info.name + " · " : ""}${info.w}×${info.d}×${info.h}` : file}
                   <small>{info ? `${t(info.system ?? "")} · ${t(info.kind ?? "")}` : ""}{filament ? ` · ${fn(filament)}` : ""}</small>
+                  {labels.length > 0 && <small className="bom-labels">{labels.join(" · ")}</small>}
                 </span>
                 <b>{count}×</b>
               </div>

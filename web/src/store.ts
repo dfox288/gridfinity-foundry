@@ -12,6 +12,7 @@ export interface Placed {
   rot: 0 | 1;       // 1: turned by 90 deg
   color?: string;
   filament?: string;  // its Bambu colour, e.g. "PLA Basic · Jade White"
+  label?: string;     // what goes in it ("M3 screws"), shown on the bin
 }
 
 export interface Layout {

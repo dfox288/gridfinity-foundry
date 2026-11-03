@@ -134,6 +134,8 @@ const DE: Record<string, string> = {
   "depth measured 423, width as the 5-drawer ALEX": "Tiefe gemessen 423, Breite wie beim ALEX mit 5 Schubladen",
   "IKEA's inside size": "Innenmaß laut IKEA",
   "approximate; measure (MALM generations differ)": "ungefähr; nachmessen (MALM-Generationen unterscheiden sich)",
+  "Label, e.g. M3 screws": "Beschriftung, z. B. M3-Schrauben",
+  "Show labels on the bins": "Beschriftungen auf den Boxen zeigen",
   // parts
   Divider: "Trenner",
   "Tab divider": "Trenner mit Lasche",

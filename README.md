@@ -11,7 +11,7 @@ onto it, and download everything as STL files or as a Bambu Studio project with 
   fillers, walls, screws, lightweight mode, …), rendered live by native OpenSCAD. The plate is split into pieces that fit
   your print bed; explode them, see each piece's size, download all pieces or one.
 - **Layout**: enter your drawer size and pick your printer, then click or drag bins from the library onto the plate. Bins
-  snap to the 42 mm grid (half-cell bins to half cells), never overlap, and can be turned, moved, copied and coloured
+  snap to the 42 mm grid (half-cell bins to half cells), never overlap, and can be turned, moved, copied, coloured and labelled ("M3 screws"; the label shows on the bin and in the print list)
   (Bambu Lab filament colours, PLA Basic/Matte, PETG). Undo and redo, keyboard shortcuts, camera views.
 - **Drawer planner**: a project holds several drawers, each with its own size and layout (tabs above the 3D view).
   Common furniture is built in (IKEA ALEX with 5 or 9 drawers, HELMER, MALM 80) and sets the inner size, or all its
