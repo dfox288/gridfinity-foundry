@@ -81,7 +81,10 @@ export function App() {
           {me.auth &&
             (me.user ? (
               <span className="account">
-                <span className="account-name" title={t("Signed in with GitHub")}>{me.user}</span>
+                <span className="account-name" title={t("Signed in with GitHub")}>
+                  {/^[\w-]+$/.test(me.user) && <img src={`https://github.com/${me.user}.png?size=40`} alt="" width={20} height={20} />}
+                  {me.user}
+                </span>
                 <a href="/oauth2/sign_out?rd=/">{t("Sign out")}</a>
               </span>
             ) : (

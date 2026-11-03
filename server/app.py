@@ -330,6 +330,12 @@ class Handler(SimpleHTTPRequestHandler):
         if os.environ.get("QUIET") != "1":
             super().log_message(fmt, *args)
 
+    def end_headers(self):
+        # the page itself is checked on every load (a new deploy shows at once); the hashed assets keep the default
+        if self.command in ("GET", "HEAD") and not self.path.startswith(("/assets/", "/api/", "/files/")):
+            self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
     def send_json(self, obj, status=200):
         body = json.dumps(obj).encode()
         self.send_response(status)

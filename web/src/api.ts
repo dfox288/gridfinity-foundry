@@ -76,19 +76,20 @@ export const api = {
   schema: () => fetch("/api/schema").then((r) => json<Param[]>(r)),
   bins: () => fetch("/api/bins").then((r) => json<BinFile[]>(r)),
   printers: () => fetch("/api/printers").then((r) => json<Printer[]>(r)),
-  // /api/me sits behind oauth2-proxy: signed out it answers a plain 401 (sign-in on, nobody signed in); its own
-  // /oauth2/userinfo (the session cookie) is the fallback when the header did not arrive
+  // /api/me sits behind oauth2-proxy: signed out it answers a plain 401 (sign-in on, nobody signed in). oauth2-proxy's
+  // own /oauth2/userinfo (the session cookie) is the fallback when /api/me fails or the header did not arrive.
   async me(): Promise<Me> {
-    const r0 = await fetch("/api/me");
-    if (r0.status === 401) return { auth: true, user: null, admin: false };
-    const me = await json<Me & { admins?: string[] }>(r0);
-    if (me.auth && !me.user) {
-      const r = await fetch("/oauth2/userinfo", { headers: { Accept: "application/json" } }).catch(() => null);
-      const info = r?.ok && (r.headers.get("Content-Type") ?? "").includes("json") ? await r.json() : null;
-      me.user = info?.preferredUsername || info?.user || null;
-      me.admin = !!me.user && (me.admins ?? []).includes(me.user.toLowerCase());
-    }
-    return { auth: me.auth, user: me.user, admin: me.admin };
+    const r0 = await fetch("/api/me", { cache: "no-store" }).catch(() => null);
+    if (r0?.status === 401) return { auth: true, user: null, admin: false };
+    const me: Me & { admins?: string[] } = r0?.ok ? await r0.json().catch(() => null) : null;
+    if (me && !me.auth) return { auth: false, user: null, admin: false };
+    if (me?.user) return { auth: true, user: me.user, admin: me.admin };
+    const r = await fetch("/oauth2/userinfo", { cache: "no-store", headers: { Accept: "application/json" } }).catch(() => null);
+    if (r?.status === 401) return { auth: true, user: null, admin: false };
+    const info = r?.ok && (r.headers.get("Content-Type") ?? "").includes("json") ? await r.json() : null;
+    if (!info && !me) return { auth: false, user: null, admin: false };
+    const user: string | null = info?.preferredUsername || info?.user || info?.email || null;
+    return { auth: true, user, admin: !!user && (me?.admins ?? []).includes(user.toLowerCase()) };
   },
   upload: (file: File, name: string, creator: string) =>
     fetch("/api/uploads", {

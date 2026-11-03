@@ -63,7 +63,12 @@ code, .num { font-family: "JetBrains Mono", ui-monospace, monospace; }
 .credit a { color: var(--text); }
 .account { display: flex; gap: 8px; align-items: center; font-size: 12px; }
 .account a, a.account { color: var(--text); }
-.account-name { color: var(--muted); }
+.account-name { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.account-name img { border-radius: 50%; }
+@media (max-width: 640px) {
+  .brand span { display: none; }
+  .topbar { gap: 12px; }
+}
 a.signin { padding: 4px 10px; border: 1px solid var(--line-2); border-radius: 999px; text-decoration: none; }
 
 .icon-btn {
