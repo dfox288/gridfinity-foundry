@@ -7,7 +7,8 @@ keeps presets, builds print zips, and serves the web app.
                                        the labels, and the uploaded bins (system "community")
   POST /api/uploads    STL bytes        upload a bin (headers X-Name, X-Creator, X-Filename, URL-encoded) -> its entry
   DELETE /api/uploads/<id>              remove an uploaded bin (its owner or an admin)
-  GET  /api/me                         {auth, user, admin, admins}: whether sign-in is on, and who is calling
+  GET  /api/me                         {auth, user, admin, admins}: whether sign-in is on, and who is calling (behind
+                                       oauth2-proxy: a plain 401 when signed out)
   GET  /files/bins/<path>              one bin or part STL ("labels/..." for the labels)
   GET  /api/presets/<kind>             presets of a kind (plate, layout): [{name, updated}]
   GET|PUT|DELETE /api/presets/<kind>/<name>   (PUT over someone else's preset and DELETE: its owner or an admin)

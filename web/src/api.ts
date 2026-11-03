@@ -76,9 +76,12 @@ export const api = {
   schema: () => fetch("/api/schema").then((r) => json<Param[]>(r)),
   bins: () => fetch("/api/bins").then((r) => json<BinFile[]>(r)),
   printers: () => fetch("/api/printers").then((r) => json<Printer[]>(r)),
-  // the public pages do not pass oauth2-proxy, so the name comes from its own /oauth2/userinfo (the session cookie)
+  // /api/me sits behind oauth2-proxy: signed out it answers a plain 401 (sign-in on, nobody signed in); its own
+  // /oauth2/userinfo (the session cookie) is the fallback when the header did not arrive
   async me(): Promise<Me> {
-    const me = await fetch("/api/me").then((r) => json<Me & { admins?: string[] }>(r));
+    const r0 = await fetch("/api/me");
+    if (r0.status === 401) return { auth: true, user: null, admin: false };
+    const me = await json<Me & { admins?: string[] }>(r0);
     if (me.auth && !me.user) {
       const r = await fetch("/oauth2/userinfo", { headers: { Accept: "application/json" } }).catch(() => null);
       const info = r?.ok && (r.headers.get("Content-Type") ?? "").includes("json") ? await r.json() : null;
