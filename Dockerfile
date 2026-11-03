@@ -22,34 +22,27 @@ RUN git clone --depth 1 --branch "$BAMBU_STUDIO_REF" --filter=blob:none --sparse
     && mv /bbs/resources/profiles/BBL /bbl-profiles
 
 FROM --platform=$BUILDPLATFORM debian:trixie-slim AS gfx
-# Gridfinity Extended (ostat, GPL-3.0): the generator our bins are made from (only for FULL_LIBRARY=1)
+# Gridfinity Extended (ostat, GPL-3.0): the generator our bins are made from (server/catalog.py renders them on demand)
 ARG GFX_REF=94d5a3e
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN git clone https://github.com/ostat/gridfinity_extended_openscad /gfx && cd /gfx && git checkout "$GFX_REF" && rm -rf .git
-
-FROM --platform=$BUILDPLATFORM openscad/openscad:trixie.2026-10-26 AS library
-# the bin library: the starter set from library/, or with FULL_LIBRARY=1 every size rendered by generator/gen_library.py
-ARG FULL_LIBRARY=0
-RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
-COPY library/ /library/
-COPY generator/ /gen/
-COPY --from=gfx /gfx /opt/gfx
-RUN if [ "$FULL_LIBRARY" = "1" ]; then python3 /gen/gen_library.py /library && rm -rf /library/.base; fi
 
 FROM openscad/openscad:trixie.2026-10-26
 RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
 COPY server/ /app/server/
 COPY generator/scad/ /app/generator/scad/
+COPY generator/presets/ /app/generator/presets/
+COPY --from=gfx /gfx /opt/gfx
 COPY templates/ /app/templates/
 COPY --from=gridflock /gridflock /opt/gridflock
 # GridFlock's build turns puzzle.svg into paths/puzzle.scad with svgelements; server/svg_paths.py does the same without it
 RUN mkdir -p /opt/gridflock/paths && python3 /app/server/svg_paths.py /opt/gridflock/puzzle.svg /opt/gridflock/paths/puzzle.scad
 COPY --from=web /web/dist /app/web
 COPY --from=bbl /bbl-profiles /opt/bbl-profiles
-COPY --from=library /library /app/library
+COPY library/ /app/library/
 # the build context may carry owner-only file modes (umask 077); the server runs as the host user
-RUN chmod -R a+rX /app /opt/gridflock /opt/bbl-profiles
-ENV BAMBU_TEMPLATES=/app/templates BBL_PROFILES=/opt/bbl-profiles GRIDFLOCK_DIR=/opt/gridflock BINS_DIR=/app/library/bins LABELS_DIR=/app/library/labels DATA_DIR=/data CACHE_DIR=/tmp/plate-cache WEB_DIR=/app/web PORT=8080 \
+RUN chmod -R a+rX /app /opt/gridflock /opt/bbl-profiles /opt/gfx
+ENV BAMBU_TEMPLATES=/app/templates BBL_PROFILES=/opt/bbl-profiles GRIDFLOCK_DIR=/opt/gridflock GFX_DIR=/opt/gfx GENERATOR_DIR=/app/generator BINS_DIR=/app/library/bins LABELS_DIR=/app/library/labels DATA_DIR=/data CACHE_DIR=/tmp/plate-cache WEB_DIR=/app/web PORT=8080 \
     HOME=/tmp
 EXPOSE 8080
 ENTRYPOINT []

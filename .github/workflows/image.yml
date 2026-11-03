@@ -1,4 +1,4 @@
-# Builds the image (amd64 + arm64, the full bin library) and publishes it to ghcr.io/<owner>/gridfinity-foundry, tagged
+# Builds the image (amd64 + arm64) and publishes it to ghcr.io/<owner>/gridfinity-foundry, tagged
 # with the commit's full sha and :latest.
 #
 # deploy (only in dfox288/gridfinity-foundry): keyless, as dfox288/meisterboard's build-and-deploy.yml: fetches the
@@ -41,7 +41,6 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64
-          build-args: FULL_LIBRARY=1
           push: true
           tags: |
             ${{ env.IMAGE }}:${{ github.sha }}

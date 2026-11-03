@@ -3,13 +3,14 @@ keeps presets, builds print zips, and serves the web app.
 
   GET  /api/schema                     GridFlock's customizer parameters (OpenSCAD's own --export-format param)
   POST /api/plate      {params}        baseplate STL (all segments, laid out with GridFlock's gaps); cached by parameters
-  GET  /api/bins                       the bin library: every STL under BINS_DIR, with system, kind and size from its name,
-                                       the labels, and the uploaded bins (system "community")
+  GET  /api/catalog                    the bins, dividers and tab dividers that can be had (server/catalog.py), compact
+  GET  /api/bins                       the labels and the uploaded bins (system "community")
   POST /api/uploads    STL bytes        upload a bin (headers X-Name, X-Creator, X-Filename, URL-encoded) -> its entry
   DELETE /api/uploads/<id>              remove an uploaded bin (its owner or an admin)
   GET  /api/me                         {auth, user, admin, admins}: whether sign-in is on, and who is calling (behind
                                        oauth2-proxy: a plain 401 when signed out)
-  GET  /files/bins/<path>              one bin or part STL ("labels/..." for the labels)
+  GET  /files/bins/<path>              one bin or part STL ("labels/..." for the labels); catalog files are rendered on the
+                                       first request and cached (BINS_DIR may hold some of them ready-made)
   GET  /api/presets/<kind>             presets of a kind (plate, layout): [{name, updated}]
   GET|PUT|DELETE /api/presets/<kind>/<name>   (PUT over someone else's preset and DELETE: its owner or an admin)
   POST /api/zip        {name, bins: [{file, count}], parts: [{file, count}], labels: [{w, fit, text, count}], plate: {params} | null,
@@ -33,6 +34,7 @@ import hashlib, io, json, os, re, subprocess, tempfile, threading, time, zipfile
 
 import bambu3mf
 import bbl_profiles
+import catalog
 import uploads
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -183,19 +185,12 @@ def render_label(w, fit, text):
 
 
 def bins():
+    """the labels and the uploads; the bins and dividers are in the catalog (/api/catalog)"""
     out = []
-    if BINS.is_dir():
-        for f in sorted(BINS.rglob("*.stl")):
-            rel = f.relative_to(BINS).as_posix()
-            m = BIN_NAME.search(f.name)
-            if m:
-                out.append({"file": rel, "type": "bin", "system": m["system"], "kind": m["kind"],
-                            "w": float(m["w"]), "d": float(m["d"]), "h": int(m["h"]), "bytes": f.stat().st_size})
-            elif (m := re.search(r"print-divider-([\d.]+)x(\d+)\.stl$", f.name)):
-                out.append({"file": rel, "type": "divider", "category": "Divider", "d": float(m[1]), "h": int(m[2]), "bytes": f.stat().st_size})
     if LABELS.is_dir():
         for f in sorted(LABELS.rglob("*.stl")):
-            out.append(part_entry("labels/" + f.relative_to(LABELS).as_posix(), f))
+            if not f.name.startswith("print-divider-tab-"):   # catalog
+                out.append(part_entry("labels/" + f.relative_to(LABELS).as_posix(), f))
     return out + uploads.entries(UPLOADS)
 
 
@@ -233,9 +228,11 @@ def bin_file(rel):
     root, rest = ((LABELS, rel[len("labels/"):]) if rel.startswith("labels/")
                   else (UPLOADS, rel[len("uploads/"):]) if rel.startswith("uploads/") else (BINS, rel))
     f = (root / rest).resolve()
-    if root not in f.parents or not f.is_file():
-        raise ValueError(f"no such file {rel}")
-    return f
+    if root in f.parents and f.is_file():
+        return f
+    if root is not UPLOADS and (f := catalog.path(rel, CACHE / "catalog", openscad)):
+        return f
+    raise ValueError(f"no such file {rel}")
 
 
 def build_zip(req):
@@ -383,6 +380,8 @@ class Handler(SimpleHTTPRequestHandler):
             if path == "/api/printers" and method == "GET":
                 ps = bbl_profiles.printers() if bbl_profiles.ROOT.is_dir() else []
                 return self.send_json([{**p, "template": (bbl_profiles.TEMPLATES / f"{p['id']}.json").is_file()} for p in ps])
+            if path == "/api/catalog" and method == "GET":
+                return self.send_json(catalog.catalog())
             if path == "/api/bins" and method == "GET":
                 return self.send_json(bins())
             if path == "/api/uploads" and method == "POST":

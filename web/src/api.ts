@@ -42,6 +42,12 @@ export interface Printer {
   extruders: number;
 }
 
+export interface Catalog {
+  heights: number[];
+  systems: Record<string, { kinds: string[]; sizes: [number, number][] }>;
+  divider_depths: number[];
+}
+
 export interface PresetInfo {
   name: string;
   updated: number;
@@ -80,7 +86,25 @@ async function json<T>(r: Response): Promise<T> {
 
 export const api = {
   schema: () => fetch("/api/schema").then((r) => json<Param[]>(r)),
-  bins: () => fetch("/api/bins").then((r) => json<BinFile[]>(r)),
+  // the labels and uploads, plus the catalog (server/catalog.py) as entries: bins, dividers and tab dividers at every
+  // height, rendered by the server when first fetched
+  async bins(): Promise<BinFile[]> {
+    const [list, cat] = await Promise.all([fetch("/api/bins").then((r) => json<BinFile[]>(r)), api.catalog()]);
+    useStore.getState().set({ heights: cat.heights });
+    const out: BinFile[] = [];
+    for (const [system, { kinds, sizes }] of Object.entries(cat.systems))
+      for (const kind of kinds)
+        for (const [w, d] of sizes)
+          for (const h of cat.heights)
+            out.push({ file: `${system}/print-bin-${system}_${kind}-${w}x${d}x${h}.stl`, type: "bin", system, kind, w, d, h, bytes: 0 });
+    for (const d of cat.divider_depths)
+      for (const h of cat.heights) {
+        out.push({ file: `dividers/print-divider-${d}x${h}.stl`, type: "divider", category: "Divider", w: 0, d, h, bytes: 0 });
+        out.push({ file: `labels/flex/print-divider-tab-${d}x${h}.stl`, type: "part", category: "Tab divider", w: 0, d, h, bytes: 0 });
+      }
+    return [...out, ...list];
+  },
+  catalog: () => fetch("/api/catalog").then((r) => json<Catalog>(r)),
   printers: () => fetch("/api/printers").then((r) => json<Printer[]>(r)),
   // /api/me sits behind oauth2-proxy: signed out it answers a plain 401 (sign-in on, nobody signed in). oauth2-proxy's
   // own /oauth2/userinfo (the session cookie) is the fallback when /api/me fails or the header did not arrive.

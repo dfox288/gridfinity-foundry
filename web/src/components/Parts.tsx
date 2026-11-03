@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { BinFile } from "../api";
 import { BAMBU, filamentName } from "../lib/bambu";
 import { translate, useT } from "../lib/i18n";
+import { HeightPicker } from "./HeightPicker";
 import { useStore } from "../store";
 import type { PartLine } from "../store";
 
@@ -41,11 +42,7 @@ export function PartsLibrary({ parts, onAdd }: { parts: BinFile[]; onAdd: (file:
           ))}
         </select>
         {tall && (
-          <div className="seg small">
-            {[3, 6, 9].map((x) => (
-              <button key={x} className={x === h ? "on" : ""} onClick={() => setH(h === x ? null : x)}>{x}U</button>
-            ))}
-          </div>
+          <HeightPicker value={h} onChange={setH} toggle />
         )}
       </div>
       <div className="part-list">

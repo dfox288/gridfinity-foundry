@@ -46,14 +46,14 @@ Runs on Linux (amd64) and macOS (Apple Silicon). Settings in `compose.yaml`:
 
 - `STUDIO_BIND=0.0.0.0` to open it to other machines on your network (it listens on localhost by default).
 - On Linux, `STUDIO_UID=$(id -u) STUDIO_GID=$(id -g)` so the presets and uploads it writes belong to you.
-- The published image has the full library; `docker compose build --build-arg FULL_LIBRARY=1` renders the whole default library (every size from 0.5 to 6 cells,
-  3/6/9 units, hex and solid, about 370 bins) instead of the starter set. Takes a few minutes.
 
 Saved presets go to `presets/`, uploaded bins to `uploads/`.
 
 ## The default library
 
-`library/` holds a starter set; `generator/` makes the full set. The bins are light Gridfinity bins (made with
+The bins are made on demand: every size from 0.5 to 6 cells, 3 to 18 units high, hex and solid, in both label systems,
+with dividers to match (`server/catalog.py`, about a second per bin the first time it is needed, then cached; set
+`CACHE_MAX_MB`, default 2000). They are light Gridfinity bins (made with
 [Gridfinity Extended](https://github.com/ostat/gridfinity_extended_openscad)) with two additions: divider ribs at the
 joints between cells with a groove in the floor, so a loose divider slides in at every cell joint, and a honeycomb per
 cell. Two label systems:

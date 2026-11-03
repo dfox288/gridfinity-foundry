@@ -1,6 +1,5 @@
 # docker compose up -d --build   ->  http://localhost:8742
-# --build-arg FULL_LIBRARY=1 (docker compose build --build-arg FULL_LIBRARY=1) renders every bin size instead of the
-# starter set (a few minutes). STUDIO_BIND=0.0.0.0 to reach it from other machines on the LAN.
+# STUDIO_BIND=0.0.0.0 to reach it from other machines on the LAN.
 # STUDIO_UID / STUDIO_GID: the owner of the files it writes (presets, uploads) on Linux: `id -u`, `id -g`.
 services:
   studio:

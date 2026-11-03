@@ -137,6 +137,8 @@ const DE: Record<string, string> = {
   "depth measured 423, width as the 5-drawer ALEX": "Tiefe gemessen 423, Breite wie beim ALEX mit 5 Schubladen",
   "IKEA's inside size": "Innenmaß laut IKEA",
   "approximate; measure (MALM generations differ)": "ungefähr; nachmessen (MALM-Generationen unterscheiden sich)",
+  "more": "mehr",
+  "Taller bins are made when first needed (about a second each)": "Höhere Boxen werden beim ersten Gebrauch erzeugt (etwa eine Sekunde pro Box)",
   "Sign in with GitHub": "Mit GitHub anmelden",
   "Sign out": "Abmelden",
   "Signed in with GitHub": "Mit GitHub angemeldet",

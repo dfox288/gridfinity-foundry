@@ -18,10 +18,16 @@ import { addPart, PART_DEFAULT, partName, PartRows, PartsLibrary } from "./Parts
 import { PresetBar } from "./PresetBar";
 import { PrinterPicker } from "./PrinterPicker";
 import { fitView, Scene, type Controls } from "./Scene";
+import { HeightPicker } from "./HeightPicker";
 import { ViewButtons } from "./ViewButtons";
 
 // default colours, all Bambu PLA Basic: [hex, name]
-const HEIGHT_COLORS: Record<number, [string, string]> = { 3: ["#0086D6", "Cyan"], 6: ["#FEC600", "Sunflower Yellow"], 9: ["#5E43B7", "Purple"] };
+const HEIGHT_COLORS: Record<number, [string, string]> = {
+  3: ["#0086D6", "Cyan"], 4: ["#00B1B7", "Turquoise"], 5: ["#00AE42", "Bambu Green"], 6: ["#FEC600", "Sunflower Yellow"],
+  7: ["#FF9016", "Pumpkin Orange"], 8: ["#EC008C", "Magenta"], 9: ["#5E43B7", "Purple"], 10: ["#C12E1F", "Red"],
+  11: ["#BECF00", "Bright Green"], 12: ["#FF6A13", "Orange"], 13: ["#F55A74", "Pink"], 14: ["#0056B8", "Cobalt Blue"],
+  15: ["#3F8E43", "Mistletoe Green"], 16: ["#9D432C", "Brown"], 17: ["#482960", "Indigo Purple"], 18: ["#9D2235", "Maroon Red"],
+};
 const SYSTEM_COLORS: Record<string, [string, string]> = { flex: ["#0056B8", "Cobalt Blue"], cullenect: ["#FF6A13", "Orange"], community: ["#00AE42", "Bambu Green"] };
 const PLATE_DEFAULT: [string, string] = ["PLA Basic · Gray", "#8E9089"];
 const SEAT = 4.4;   // a bin's bottom below the plate top
@@ -142,11 +148,7 @@ function Library({ armed, onArm }: { armed: string | null; onArm: (f: string | n
                 <button key={k} className={k === kind ? "on" : ""} onClick={() => setKind(k)}>{t(k)}</button>
               ))}
             </div>
-            <div className="seg small">
-              {[3, 6, 9].map((x) => (
-                <button key={x} className={x === h ? "on" : ""} onClick={() => setH(x)}>{x}U</button>
-              ))}
-            </div>
+            <HeightPicker value={h} onChange={(x) => x !== null && setH(x)} />
           </>
         )}
       </div>

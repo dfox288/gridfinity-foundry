@@ -57,6 +57,7 @@ interface State {
   schema: Param[];
   bins: BinFile[];
   printers: Printer[];
+  heights: number[];   // bin heights the catalog has (server/catalog.py)
   me: Me;
   printer: string;    // Bambu printer preset: bed size and the Bambu project's settings
   plate: Record<string, ParamValue>;
@@ -125,6 +126,7 @@ export const useStore = create<State>((set, get) => ({
   schema: [],
   bins: [],
   printers: [],
+  heights: [3, 6, 9],
   me: { auth: false, user: null, admin: false },
   printer: savedPrinter ?? "Bambu Lab P1S 0.6 nozzle",
   plate: {},
