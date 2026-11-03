@@ -77,11 +77,20 @@ module ridge() {
 }
 
 // per height: columns [x from the cell centre, row set], row set 0, row set 1 (z of the hole centres)
+// 3, 6 and 9U as measured; taller bins continue the 6/9U rule (rows from 11.2 to 8.9 under the top, about 10.7 apart, the
+// middle column between them), so the honeycomb reaches the top of any height
+// (rows at least 9 apart; 4U has room for one row only, laid out as 3U)
+function rows(h) = let(top = 7 * h - 8.9, n0 = round((top - 11.2) / 10.725) + 1, n = (top - 11.2) / max(n0 - 1, 1) < 9 ? n0 - 1 : n0)
+  [for (i = [0 : n - 1]) 11.2 + i * (top - 11.2) / (n - 1)];
 function layout(h) = h == 3 ? [[[-8.5, 0], [8.5, 0]], [11.65], []]
+  : h == 4 ? [[[-8.5, 0], [8.5, 0]], [(11.2 + 7 * h - 8.9) / 2], []]
   : h == 6 ? [[[-10.5, 0], [0, 1], [10.5, 0]], [11.2, 22.15, 33.1], [16.675, 27.625]]
-  : [[[-10.5, 0], [0, 1], [10.5, 0]], [11.2, 21.92, 32.65, 43.375, 54.1], [16.56, 27.29, 38.01, 48.74]];
+  : h == 9 ? [[[-10.5, 0], [0, 1], [10.5, 0]], [11.2, 21.92, 32.65, 43.375, 54.1], [16.56, 27.29, 38.01, 48.74]]
+  : let(r = rows(h)) [[[-10.5, 0], [0, 1], [10.5, 0]], r, [for (i = [0 : len(r) - 2]) (r[i] + r[i + 1]) / 2]];
 
-module hex_hole(x, z) { translate([x, -1, z]) rotate([-90, 0, 0]) cylinder(r = 4.5, h = WALL + 1.05, $fn = 6); }
+// Gridfinity Extended makes the wall thicker on tall bins (up to 1.6), so from 10U the holes go deeper (to 9U as before)
+function wall_in(h) = WALL + (h <= 9 ? 0 : 0.75);
+module hex_hole(x, z) { translate([x, -1, z]) rotate([-90, 0, 0]) cylinder(r = 4.5, h = wall_in(height) + 1.05, $fn = 6); }
 // the holes for one wall `n` cells long (whole cells, then a half one), wall along x, its outer face at y 0
 module wall_holes(n, z_max = 1000) {
   L = layout(height); full = floor(n); x0 = -21 * n;
