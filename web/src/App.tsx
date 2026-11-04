@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { api } from "./api";
 import { LayoutTab } from "./components/LayoutTab";
+import { LegalLinks } from "./components/Legal";
 import { PlateTab } from "./components/PlateTab";
 import { translate } from "./lib/i18n";
 import { loadProject, project, toProject, useStore } from "./store";
@@ -81,6 +82,7 @@ export function App() {
           <span className="credit">
             {t("plates by")} <a href="https://github.com/yawkat/gridflock" target="_blank" rel="noreferrer">GridFlock</a>
           </span>
+          <LegalLinks />
           {me.auth &&
             (me.user ? (
               <span className="account">

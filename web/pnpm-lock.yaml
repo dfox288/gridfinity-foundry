@@ -166,6 +166,12 @@ importers:
 
   .:
     dependencies:
+      '@fontsource/inter':
+        specifier: 5.1.0
+        version: 5.1.0
+      '@fontsource/jetbrains-mono':
+        specifier: 5.1.1
+        version: 5.1.1
       '@react-three/drei':
         specifier: 9.114.0
         version: 9.114.0(@react-three/fiber@8.17.10(@types/react@18.3.11)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.169.0))(@types/react@18.3.11)(@types/three@0.169.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.169.0)
@@ -430,6 +436,12 @@ packages:
     engines: {node: '>=12'}
     cpu: [x64]
     os: [win32]
+
+  '@fontsource/inter@5.1.0':
+    resolution: {integrity: sha512-zKZR3kf1G0noIes1frLfOHP5EXVVm0M7sV/l9f/AaYf+M/DId35FO4LkigWjqWYjTJZGgplhdv4cB+ssvCqr5A==}
+
+  '@fontsource/jetbrains-mono@5.1.1':
+    resolution: {integrity: sha512-5rwvmdQQpXev4LlBX1P+7h2dguu6iwW/9Npjde4+DEq+HgpVJI/7QY8DI1NVVFdvLtXZNP+vO2L/5BQED6FUhA==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -1302,6 +1314,10 @@ snapshots:
 
   '@esbuild/win32-x64@0.21.5':
     optional: true
+
+  '@fontsource/inter@5.1.0': {}
+
+  '@fontsource/jetbrains-mono@5.1.1': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:

@@ -49,6 +49,11 @@ Runs on Linux (amd64) and macOS (Apple Silicon). Settings in `compose.yaml`:
 
 Saved presets go to `presets/`, uploaded bins to `uploads/`.
 
+A public installation in Germany needs an imprint and a privacy notice: put `imprint.de.md`, `imprint.en.md`,
+`privacy.de.md` and `privacy.en.md` (Markdown) into `LEGAL_DIR` (default `/data/legal`); the app then links them in the
+top bar and serves them at `/imprint` and `/privacy`. The fonts are bundled, so the app itself makes no requests to
+third parties.
+
 ## The default library
 
 The bins are made on demand: every size from 0.5 to 6 cells, 3 to 18 units high, hex and solid, in both label systems,

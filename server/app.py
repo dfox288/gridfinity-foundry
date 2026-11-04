@@ -3,6 +3,8 @@ keeps presets, builds print zips, and serves the web app.
 
   GET  /api/schema                     GridFlock's customizer parameters (OpenSCAD's own --export-format param)
   POST /api/plate      {params}        baseplate STL (all segments, laid out with GridFlock's gaps); cached by parameters
+  GET  /api/legal                      which legal pages there are: ["imprint", "privacy"] (files in LEGAL_DIR)
+  GET  /api/legal/<page>?lang=de|en    one as Markdown (LEGAL_DIR/<page>.<lang>.md, else the other language)
   GET  /api/catalog                    the bins, dividers and tab dividers that can be had (server/catalog.py), compact
   GET  /api/bins                       the labels and the uploaded bins (system "community")
   POST /api/uploads    STL bytes        upload a bin (headers X-Name, X-Creator, X-Filename, URL-encoded) -> its entry
@@ -24,7 +26,7 @@ keeps presets, builds print zips, and serves the web app.
   everything else                      the web app (WEB_DIR, index.html for unknown paths)
 
 Environment: GRIDFLOCK_DIR, BINS_DIR, DATA_DIR (presets), CACHE_DIR (plate STLs), WEB_DIR, OPENSCAD, PORT, RENDER_JOBS,
-USER_HEADER, ADMINS, AUTH_PROVIDERS.
+USER_HEADER, ADMINS, AUTH_PROVIDERS, LEGAL_DIR (imprint and privacy notice of the installation, not in the repo).
 
 Sign-in (2026-11-03): the server has no login of its own. With USER_HEADER set (e.g. X-Auth-Request-User,
 filled by oauth2-proxy with the GitHub login in front of the write routes), every write needs that header, and uploads
@@ -52,6 +54,8 @@ DATA = Path(os.environ.get("DATA_DIR", "/data")).resolve()
 WEB = Path(os.environ.get("WEB_DIR", "/app/web")).resolve()
 CACHE = Path(os.environ.get("CACHE_DIR", str(DATA / "cache"))).resolve()
 GEN_SCAD = Path(os.environ.get("GENERATOR_SCAD", "/app/generator/scad")).resolve()   # flex_label.scad (engraved labels)
+LEGAL = Path(os.environ.get("LEGAL_DIR", str(DATA / "legal"))).resolve()   # imprint.de.md, privacy.en.md, ...
+LEGAL_PAGES = ("imprint", "privacy")
 UPLOADS = Path(os.environ.get("UPLOADS_DIR", str(DATA / "uploads"))).resolve()   # bins uploaded by users (server/uploads.py)
 OPENSCAD = os.environ.get("OPENSCAD", "openscad")
 PORT = int(os.environ.get("PORT", "8080"))
@@ -405,6 +409,14 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json([{**p, "template": (bbl_profiles.TEMPLATES / f"{p['id']}.json").is_file()} for p in ps])
             if path == "/api/auth" and method == "GET":
                 return self.send_json({"auth": bool(USER_HEADER), "providers": AUTH_PROVIDERS})
+            if path == "/api/legal" and method == "GET":
+                return self.send_json([p for p in LEGAL_PAGES if any(LEGAL.glob(f"{p}.*.md"))])
+            if (m := re.fullmatch(r"/api/legal/(\w+)", path)) and method == "GET" and m[1] in LEGAL_PAGES:
+                lang = "de" if "lang=de" in (urlparse(self.path).query or "") else "en"
+                for f in (LEGAL / f"{m[1]}.{lang}.md", LEGAL / f"{m[1]}.{'en' if lang == 'de' else 'de'}.md"):
+                    if f.is_file():
+                        return self.send_bytes(f.read_bytes(), "text/markdown; charset=utf-8", {"Cache-Control": "no-cache"})
+                return self.send_json({"error": "not found"}, 404)
             if path == "/api/catalog" and method == "GET":
                 return self.send_json(catalog.catalog())
             if path == "/api/bins" and method == "GET":
