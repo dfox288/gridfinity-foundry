@@ -55,6 +55,10 @@ module plug() {
     for (j = [1 : 1 : cells - 1]) translate([-BW0 / 2 - 0.25 + 42 * j - 4.2, -BD / 2 - 1, -1.35]) cube([8.4, 1 + 1.91 + clr + 0.1, 2]);
     if (txt != "") translate([0, -BD / 2 + (yf(top) + depth) / 2, top - txt_depth]) linear_extrude(txt_depth + 0.01)
       text(txt, size = txt_size, font = "DejaVu Sans", halign = "center", valign = "center");
+    // the same mark in the bottom face (up when printed, hidden in the bin), so it shows in the slicer and on the plate
+    // (the bed-face mark can't be seen in an STL viewer)
+    if (txt != "") translate([0, -BD / 2 + (yf(bottom) + depth) / 2, bottom - 0.01]) linear_extrude(txt_depth + 0.01)
+      mirror([0, 1]) text(txt, size = txt_size, font = "DejaVu Sans", halign = "center", valign = "center");
   }
 }
 

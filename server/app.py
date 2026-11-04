@@ -249,6 +249,10 @@ def list_presets(kind):
     return sorted(out, key=lambda p: -p["updated"])
 
 
+OLD_FIT = re.compile(r"labels/(?P<dir>flex|v1)/(?P<stem>print-(?:flex-label|lip-plug)-[\d.]+)_fit[\d.]+\.stl")
+LABEL_FIT = {"flex": "0.2", "v1": "0.6"}   # generator/gen_labels.py FLEX_FIT, PLUG_FIT
+
+
 def bin_file(rel):
     """a library file: "labels/..." under LABELS, "uploads/..." under UPLOADS, everything else under BINS"""
     root, rest = ((LABELS, rel[len("labels/"):]) if rel.startswith("labels/")
@@ -257,6 +261,9 @@ def bin_file(rel):
     if root in f.parents and f.is_file():
         return f
     if root is not UPLOADS and (f := catalog.path(rel, CACHE / "catalog", openscad)):
+        return f
+    # layouts saved before the label fits were settled name a fit that is no longer shipped: use the current one
+    if (m := OLD_FIT.fullmatch(rel)) and (f := LABELS / m["dir"] / f"{m['stem']}_fit{LABEL_FIT[m['dir']]}.stl").is_file():
         return f
     raise ValueError(f"no such file {rel}")
 

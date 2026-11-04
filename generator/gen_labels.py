@@ -10,8 +10,8 @@ from concurrent.futures import ThreadPoolExecutor
 ROOT = pathlib.Path(__file__).resolve().parent
 OUT = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "library").resolve()
 WIP = OUT / "labels"
-FLEX_FITS = (0, 0.2)
-PLUG_FITS = (0, 0.1, 0.2)
+FLEX_FIT = 0.2    # holds in 1- and 2-wide groove bins (test prints with a 0.6 nozzle)
+PLUG_FIT = 0.6    # lip plugs: 0.6 holds in 1- and 2-wide plain light bins; less slides out
 
 
 def cells(v):
@@ -33,18 +33,15 @@ def main(everything=False):
     sets = json.loads((ROOT / "presets/solid_light.json").read_text())["parameterSets"]
     sizes = {(cells(p["width"]), cells(p["depth"])) for k, p in sets.items() if not k.endswith("-flat")}
     for w in sorted({w for w, _ in sizes}):
-        for f in FLEX_FITS:
-            out = WIP / "flex" / f"print-flex-label-{w:g}_fit{f:g}.stl"
-            jobs.append((openscad, (["-D", 'part="label"', "-D", f"cells_x={w:g}", "-D", f"fit={f}", "scad/flex_label.scad"], out)))
+        out = WIP / "flex" / f"print-flex-label-{w:g}_fit{FLEX_FIT:g}.stl"
+        jobs.append((openscad, (["-D", 'part="label"', "-D", f"cells_x={w:g}", "-D", f"fit={FLEX_FIT}", "scad/flex_label.scad"], out)))
     for n, c in ((1, "left"), (2, "right")):
         out = WIP / "flex" / f"print-flex-corner-{n}-{c}_tab.stl"
         jobs.append((openscad, (["-D", 'part="label"', "-D", f"cells_x={n}", "-D", f'corner="{c}"', "-D", "tab=true",
                                  "-D", "fit=0.2", "-D", "bin_x=3", "scad/flex_label.scad"], out)))
     for n in (1, 2):
-        for f in PLUG_FITS:
-            out = WIP / "v1" / f"print-lip-plug-{n}_fit{f:g}.stl"
-            jobs.append((openscad, (["-D", f"cells={n}", "-D", f"fit={f}", "-D", f'txt="{f:g}"'.replace('"0.', '".'),
-                                     "scad/lip_plug.scad"], out)))
+        out = WIP / "v1" / f"print-lip-plug-{n}_fit{PLUG_FIT:g}.stl"
+        jobs.append((openscad, (["-D", f"cells={n}", "-D", f"fit={PLUG_FIT}", "scad/lip_plug.scad"], out)))
     todo = [j for j in jobs if everything or not j[1][-1].exists()]
     print(len(todo), "of", len(jobs), "STLs to render")
     with ThreadPoolExecutor(os.cpu_count() or 4) as ex:

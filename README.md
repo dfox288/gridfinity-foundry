@@ -67,8 +67,8 @@ cell. Two label systems:
   stackable.
 - **click**: a socket on a shelf in one corner for [Cullenect V2](https://makerworld.com/en/models/446624) click labels.
 
-Dividers fit both. The labels in `library/labels/` (flex labels, corner labels with a tab divider, and lip plugs and glue
-labels for plain light bins) are still being tested.
+Dividers fit both. The labels in `library/labels/`: flex labels for the groove bins (fit 0.2), lip plugs (fit 0.6) and
+glue labels for plain light bins, all tested; the corner labels with a tab divider are still being tested.
 
 ## Bambu Studio projects and printer templates
 

@@ -21,6 +21,8 @@ import { fitView, Scene, type Controls } from "./Scene";
 import { HeightPicker } from "./HeightPicker";
 import { ViewButtons } from "./ViewButtons";
 
+const FLEX_FIT = 0.2;   // flex label press fit (mm, total): holds in every groove bin width
+
 // default colours, all Bambu PLA Basic: [hex, name]
 const HEIGHT_COLORS: Record<number, [string, string]> = {
   3: ["#0086D6", "Cyan"], 4: ["#00B1B7", "Turquoise"], 5: ["#00AE42", "Bambu Green"], 6: ["#FEC600", "Sunflower Yellow"],
@@ -442,7 +444,7 @@ export function LayoutTab() {
       }
     return [...m.values()];
   }, [inScope]);
-  // engraved flex labels for the labelled flex bins: one each, text as on the bin (fit 0 for 1-wide, 0.2 wider)
+  // engraved flex labels for the labelled flex bins: one each, text as on the bin (fit 0.2: holds in every width)
   const [engrave, setEngrave] = useState(true);
   const engraved = useMemo(() => {
     const m = new Map<string, { w: number; fit: number; text: string; count: number }>();
@@ -451,7 +453,7 @@ export function LayoutTab() {
       for (const b of d.layout.bins) {
         const info = lib.get(b.file);
         if (!b.label || info?.system !== "groove") continue;
-        const fit = info.w <= 1 ? 0 : 0.2;
+        const fit = FLEX_FIT;
         const k = `${info.w}|${fit}|${b.label}`;
         const e = m.get(k);
         m.set(k, e ? { ...e, count: e.count + 1 } : { w: info.w, fit, text: b.label, count: 1 });
@@ -486,8 +488,7 @@ export function LayoutTab() {
   const addLabel = () => {
     if (!selInfo) return;
     if (selInfo.system !== "groove") return toast(t("Click labels (Cullenect) come from MakerWorld (model 446624)"));
-    const fit = selInfo.w <= 1 ? 0 : 0.2;   // 2026-11-03: 1-wide only fit 0 held, 2-wide fit 0.2
-    const lab = partLib.find((p) => p.category === "Flex label" && p.w === selInfo.w && p.fit === fit);
+    const lab = partLib.find((p) => p.category === "Flex label" && p.w === selInfo.w && (p.fit ?? FLEX_FIT) === FLEX_FIT);
     if (!lab) return toast(t("No flex label for this width"));
     setParts(addPart(parts, lab.file));
     toast(t("Flex label {w} added", { w: selInfo.w }));
