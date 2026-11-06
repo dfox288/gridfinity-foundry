@@ -1,7 +1,7 @@
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { CameraControls, ContactShadows, Environment, Grid, Lightformer, OrthographicCamera } from "@react-three/drei";
 import * as THREE from "three";
-import { type ReactNode, type RefObject } from "react";
+import { type ReactNode, type RefObject, useRef } from "react";
 
 // Our models are Z-up (OpenSCAD); the camera and the controls follow
 THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
@@ -44,7 +44,7 @@ export function Scene({
   onPointerMissed?: () => void;
   floorZ?: number;
   plan?: boolean;   // the plan view: an orthographic camera from above, no turning, left or right drag pans
-  onZoom?: (zoom: number) => void;   // the plan camera's zoom (pixels per mm), rounded, as it changes
+  onZoom?: (pxPerMm: number) => void;   // how many screen pixels a mm at the view's centre has, rounded, as it changes
 }) {
   const dark = theme === "dark";
   return (
@@ -92,6 +92,7 @@ export function Scene({
         infiniteGrid
       />
       <ContactShadows position={[0, 0, floorZ - 0.02]} rotation={[Math.PI / 2, 0, 0]} scale={1600} blur={2.6} far={60} opacity={dark ? 0.55 : 0.35} resolution={1024} />
+      {onZoom && <ZoomReporter controlsRef={controlsRef} onZoom={onZoom} />}
       {plan && <OrthographicCamera makeDefault position={[0, 0, 3000]} near={1} far={20000} zoom={1} />}
       {plan ? (
         // camera-controls ACTION values: TRUCK 2, ZOOM 32, TOUCH_TRUCK 128, TOUCH_ZOOM_TRUCK 65536
@@ -109,10 +110,6 @@ export function Scene({
           maxZoom={20}
           mouseButtons={{ left: 2, middle: 32, right: 2, wheel: 32 }}
           touches={{ one: 128, two: 65536, three: 0 }}
-          onChange={() => {
-            const z = (controlsRef.current?.camera as THREE.OrthographicCamera | undefined)?.zoom;
-            if (z && onZoom) onZoom(Math.round(z * 20) / 20);
-          }}
         />
       ) : (
         <CameraControls key="perspective" ref={controlsRef} makeDefault smoothTime={0.28} maxDistance={6000} minDistance={30} />
@@ -120,4 +117,25 @@ export function Scene({
       {children}
     </Canvas>
   );
+}
+
+// Reports the screen scale (pixels per mm at the point the camera looks at) whenever it changes by 5 %: the zoom of
+// the orthographic camera, from the distance and field of view of the perspective one
+function ZoomReporter({ controlsRef, onZoom }: { controlsRef: RefObject<Controls>; onZoom: (pxPerMm: number) => void }) {
+  const last = useRef(0);
+  const target = useRef(new THREE.Vector3());
+  useFrame((state) => {
+    const cam = state.camera as THREE.PerspectiveCamera & THREE.OrthographicCamera;
+    let ppm = cam.zoom;
+    if (cam.isPerspectiveCamera) {
+      const c = controlsRef.current;
+      const dist = c ? cam.position.distanceTo(c.getTarget(target.current)) : cam.position.length();
+      ppm = state.size.height / 2 / (dist * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)));
+    }
+    if (ppm > 0 && Math.abs(ppm - last.current) > last.current * 0.05) {
+      last.current = ppm;
+      onZoom(Math.round(ppm * 100) / 100);
+    }
+  });
+  return null;
 }

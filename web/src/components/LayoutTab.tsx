@@ -273,7 +273,7 @@ export function LayoutTab() {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);   // the bin's right-click menu, at the pointer
   const [help, setHelp] = useState(false);
   const [plan, setPlan] = useState(false);   // the flat plan view (orthographic, from above)
-  const [planZoom, setPlanZoom] = useState(1.8);   // its pixels per mm, for labels that fit their bins
+  const [planZoom, setPlanZoom] = useState(1.8);   // screen pixels per mm: labels fit their bins (plan), thin out when small
   // a right click opens the bin menu, a right drag pans the view: the menu waits for the button to come up (Linux and
   // macOS fire contextmenu on the way down, Windows on the way up) and opens only if the pointer stayed put
   const right = useRef<{ down?: [number, number]; up?: [number, number]; held: boolean; pending?: { x: number; y: number; id: string } }>({ held: false });
@@ -1033,6 +1033,9 @@ export function LayoutTab() {
             layout.bins.map((b) => {
               const info = lib.get(b.file);
               if (!b.label || !info || drag?.id === b.id) return null;
+              // zoomed out (a cell under 40 px) only the bins under the pointer or selected keep their label
+              const far = PITCH * planZoom < 40;
+              if (far && b.id !== hoverBin && !inGroup(b.id)) return null;
               const [w, d] = fp(info, b.rot);
               // on the front edge of the bin, at its top; in the plan view in its middle, no wider than the bin
               return (
@@ -1041,7 +1044,7 @@ export function LayoutTab() {
                   position={[(b.x + w / 2) * PITCH, plan ? (b.y + d / 2) * PITCH : b.y * PITCH + 7, top - SEAT + 7 * info.h + 5]}
                   center
                   zIndexRange={[10, 0]}
-                  distanceFactor={plan ? undefined : 420}
+                  distanceFactor={plan || far ? undefined : 420}   // zoomed out: the few left keep a readable size
                 >
                   <div
                     className={`bin-label ${inGroup(b.id) ? "on" : ""} ${plan ? "plan" : ""}`}
