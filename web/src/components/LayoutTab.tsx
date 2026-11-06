@@ -25,6 +25,7 @@ import { PrinterPicker } from "./PrinterPicker";
 import { fitView, Scene, type Controls } from "./Scene";
 import { HeightPicker } from "./HeightPicker";
 import { ViewButtons } from "./ViewButtons";
+import { FindBin } from "./FindBin";
 
 const FLEX_FIT = 0.2;   // flex label press fit (mm, total): holds in every groove bin width
 
@@ -809,6 +810,7 @@ export function LayoutTab() {
           </div>
         )}
         <div className="hud">
+          <FindBin />
           {/* the selected bin's card; greyed out while nothing is selected (2026-11-03) */}
           <div className={`card selected ${sel && selInfo ? "" : "idle"}`}>
             <div className="sel-head">

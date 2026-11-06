@@ -13,6 +13,9 @@ const DE: Record<string, string> = {
   "Loading GridFlock…": "GridFlock wird geladen…",
   // share links
   Share: "Teilen",
+  "Find a bin by its label…": "Box nach Beschriftung suchen…",
+  "Nothing found": "Nichts gefunden",
+  "{n} more": "{n} weitere",
   "Or start from an example:": "Oder mit einem Beispiel anfangen:",
   "Drawer map to print": "Schubladenplan zum Ausdrucken",
   "A top view of each drawer with every bin's label, to print and stick inside the cabinet": "Draufsicht jeder Schublade mit den Beschriftungen der Boxen, zum Ausdrucken und Aufkleben in den Schrank",
