@@ -13,6 +13,7 @@ export interface Placed {
   color?: string;
   filament?: string;  // its Bambu colour, e.g. "PLA Basic · Jade White"
   label?: string;     // what goes in it ("M3 screws"), shown on the bin
+  z?: number;         // the layer: 0 (or missing) on the baseplate, 1 standing on bins of layer 0, …
 }
 
 export interface Layout {

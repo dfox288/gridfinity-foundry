@@ -77,6 +77,7 @@ test("dragging an edge handle resizes the bin", async ({ page }) => {
   const z = 0.25 + 42 + 6;
   const drag = async (from: [number, number], to: [number, number]) => {
     await page.mouse.move(...(await toScreen(page, from[0], from[1], z)));
+    await page.waitForTimeout(250);   // let the scene see the pointer over the handle first (see clickAt)
     await page.mouse.down();
     await page.mouse.move(...(await toScreen(page, to[0], to[1], z)), { steps: 8 });
     await page.mouse.up();

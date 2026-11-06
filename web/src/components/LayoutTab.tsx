@@ -26,7 +26,7 @@ import { fitView, Scene, type Controls } from "./Scene";
 import { ViewButtons } from "./ViewButtons";
 import { FindBin } from "./FindBin";
 import { MOD, Shortcuts } from "./Shortcuts";
-import { arrowAxes, type Box, type Cand, copySpot, type Edge, fits, fp, resizeBox, sameKindSized, snap, whole } from "../lib/placement";
+import { arrowAxes, baseFor, baseOf, floating, layerOf, type Box, type Cand, copySpot, type Edge, fits, fp, resizeBox, sameKindSized, snap, whole } from "../lib/placement";
 
 const FLEX_FIT = 0.2;   // flex label press fit (mm, total): holds in every groove bin width
 import { binColor, PLATE_DEFAULT } from "../lib/colors";
@@ -55,10 +55,15 @@ export function LayoutTab() {
   const [armed, setArmed] = useState<string | null>(null);
   const [armedRot, setArmedRot] = useState<0 | 1>(0);
   const [hover, setHover] = useState<[number, number] | null>(null);
-  const [drag, setDrag] = useState<{ id: string; dx: number; dy: number; x: number; y: number; rot: 0 | 1 } | null>(null);
+  const [drag, setDragState] = useState<{ id: string; dx: number; dy: number; x: number; y: number; rot: 0 | 1 } | null>(null);
+  // the newest drag and resize also in refs: a quick release can come before React has rendered the last move
+  const dragRef = useRef(drag);
+  const setDrag = (v: typeof drag) => ((dragRef.current = v), setDragState(v));
   const [hoverBin, setHoverBin] = useState<string | null>(null);
   // a bin being resized by one of its edge handles: the box as it would become
-  const [resize, setResize] = useState<{ id: string; edge: Edge; start: Box; box: Box } | null>(null);
+  const [resize, setResizeState] = useState<{ id: string; edge: Edge; start: Box; box: Box } | null>(null);
+  const resizeRef = useRef(resize);
+  const setResize = (v: typeof resize) => ((resizeRef.current = v), setResizeState(v));
   const [hoverEdge, setHoverEdge] = useState<Edge | null>(null);
   // a finger on a bin, waiting to see whether it is a tap, a hold (pick it up) or the start of turning the view
   const press = useRef<{ id: string; at: [number, number]; timer: number } | null>(null);
@@ -82,7 +87,8 @@ export function LayoutTab() {
   const resized = useRef(false);   // the click that ends a resize is not a click on the empty plate
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);   // the bin's right-click menu, at the pointer
   const [help, setHelp] = useState(false);
-  const [plan, setPlan] = useState(false);   // the flat plan view (orthographic, from above)
+  const [plan, setPlan] = useState(false);
+  const [layer, setLayer] = useState(0);   // the layer being edited: 0 the floor, 1 bins standing on the floor's, …   // the flat plan view (orthographic, from above)
   const [planZoom, setPlanZoom] = useState(1.8);   // screen pixels per mm: labels fit their bins (plan), thin out when small
   // a right click opens the bin menu, a right drag pans the view: the menu waits for the button to come up (Linux and
   // macOS fire contextmenu on the way down, Windows on the way up) and opens only if the pointer stayed put
@@ -121,28 +127,44 @@ export function LayoutTab() {
   const ghost: Cand | null = drag
     ? (() => {
         const b = layout.bins.find((x) => x.id === drag.id);
-        return b ? { file: b.file, x: drag.x, y: drag.y, rot: drag.rot } : null;
+        return b ? { file: b.file, x: drag.x, y: drag.y, rot: drag.rot, z: b.z } : null;
       })()
     : armedInfo && hover
       ? (() => {
           const [x, y] = snap(hover[0], hover[1], armedInfo, armedRot, g);
-          return { file: armedInfo.file, x, y, rot: armedRot };
+          return { file: armedInfo.file, x, y, rot: armedRot, z: layer };
         })()
       : null;
   const ghostOk = ghost ? fits(ghost, lib.get(ghost.file)!, g, layout.bins, lib, drag?.id) : false;
 
-  const place = (c: Cand) => {
+  const place = (c0: Cand) => {
+    const c = { ...c0, z: c0.z ?? layer };
     const info = lib.get(c.file);
     if (!info || !fits(c, info, g, layout.bins, lib)) return false;
     const id = Math.random().toString(36).slice(2, 9);
-    editBins((b) => [...b, { id, ...c }]);
+    editBins((b) => [...b, { id, ...c, z: c.z || undefined }]);
     set({ selected: id });
     return true;
   };
 
-  const centre = (b: { x: number; y: number; rot: 0 | 1 }, info: BinFile) => {
+  // where each bin stands (mm above the floor bins' bottom): 0 on the floor, the tops of the bins below when stacked
+  const bases = useMemo(() => new Map(layout.bins.map((b) => [b.id, baseOf(b, layout.bins, lib)])), [layout.bins, lib]);
+  const baseOfId = (id?: string) => (id ? bases.get(id) ?? 0 : 0);
+  const ghostBase = ghost && layerOf(ghost) > 0 ? baseFor(ghost, lib.get(ghost.file)!, layout.bins, lib, drag?.id) ?? layerFloor(layerOf(ghost)) : 0;
+  // the usual height of a layer (the most common top of the bins below), for the pointer plane and unsupported ghosts
+  function layerFloor(l: number) {
+    if (l === 0) return 0;
+    const tops = layout.bins.filter((b) => layerOf(b) === l - 1).map((b) => baseOfId(b.id) + 7 * (lib.get(b.file)?.h ?? 0));
+    if (!tops.length) return 0;
+    const count = new Map<number, number>();
+    tops.forEach((t) => count.set(t, (count.get(t) ?? 0) + 1));
+    return [...count.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  }
+  const editFloor = layerFloor(layer);
+
+  const centre = (b: { x: number; y: number; rot: 0 | 1 }, info: BinFile, base = 0) => {
     const [w, d] = fp(info, b.rot);
-    return new THREE.Vector3((b.x + w / 2) * PITCH, (b.y + d / 2) * PITCH, top - SEAT);
+    return new THREE.Vector3((b.x + w / 2) * PITCH, (b.y + d / 2) * PITCH, top - SEAT + base);
   };
 
   const selNow = () => layout.bins.find((b) => b.id === selected);
@@ -186,6 +208,12 @@ export function LayoutTab() {
   // for poking at it from the browser console and tests, like window.studio
   (window as unknown as { foundryControls: typeof controls }).foundryControls = controls;
 
+  // a bin chosen elsewhere (search, Find, the menu) on another layer: go to its layer
+  useEffect(() => {
+    const b = layout.bins.find((x) => x.id === selected);
+    if (b && layerOf(b) !== layer) setLayer(layerOf(b));
+  }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Iso, Top and Front leave the plan view (its camera cannot turn)
   const view = (v: "iso" | "top" | "front") => {
     if (plan) {
@@ -213,7 +241,7 @@ export function LayoutTab() {
     return { placed, left: [...res.left.map((i) => known[i]), ...fit.filter((r) => !lib.has(file(r)))] };
   };
   const placeInventory = (rows: InvRow[]) => {
-    const taken = layout.bins.flatMap((b) => {
+    const taken = layout.bins.filter((b) => layerOf(b) === 0).flatMap((b) => {
       const i = lib.get(b.file);
       if (!i) return [];
       const [w, d] = fp(i, b.rot);
@@ -246,7 +274,8 @@ export function LayoutTab() {
     const c = controls.current;
     if (!info || !c) return;
     const [w, d] = fp(info, b.rot);
-    const box = new THREE.Box3(new THREE.Vector3(b.x * PITCH, b.y * PITCH, top - SEAT), new THREE.Vector3((b.x + w) * PITCH, (b.y + d) * PITCH, top - SEAT + 7 * info.h + 4));
+    const z0 = top - SEAT + baseOfId(b.id);
+    const box = new THREE.Box3(new THREE.Vector3(b.x * PITCH, b.y * PITCH, z0), new THREE.Vector3((b.x + w) * PITCH, (b.y + d) * PITCH, z0 + 7 * info.h + 4));
     // padding in world units: room around the bin, more on the right where the panels float over the view
     const m = Math.max(w, d) * PITCH;
     void c.fitToBox(box, true, { paddingTop: m * 0.8, paddingBottom: m * 0.8, paddingLeft: m * 0.8, paddingRight: m * 1.6 });
@@ -276,7 +305,8 @@ export function LayoutTab() {
       if (e.key === "Escape") return setArmed(null), set({ selected: null });
       if (mod && e.key.toLowerCase() === "a" && layout.bins.length) {
         e.preventDefault();
-        const ids = layout.bins.map((b) => b.id);
+        const ids = layout.bins.filter((b) => layerOf(b) === layer).map((b) => b.id);
+        if (!ids.length) return;
         return set({ selected: ids[ids.length - 1], also: ids.slice(0, -1) });
       }
       const sel = layout.bins.find((b) => b.id === selected);
@@ -342,19 +372,20 @@ export function LayoutTab() {
   }
 
   // the bin a resize would give: the library's bin of that size (same system, kind, height), whether it fits there
-  const resizeTo = (() => {
-    if (!resize) return null;
-    const b = layout.bins.find((x) => x.id === resize.id);
+  const resizeOutcome = (r: typeof resize) => {
+    if (!r) return null;
+    const b = layout.bins.find((x) => x.id === r.id);
     const info = b && lib.get(b.file);
     if (!b || !info) return null;
-    const hit = sameKindSized(library, info, resize.box.w, resize.box.d);
-    const c = hit ? { file: hit.file.file, x: resize.box.x, y: resize.box.y, rot: hit.rot } : null;
+    const hit = sameKindSized(library, info, r.box.w, r.box.d);
+    const c = hit ? { file: hit.file.file, x: r.box.x, y: r.box.y, rot: hit.rot, z: b.z } : null;
     return { b, hit, c, ok: !!c && !!hit && fits(c, hit.file, g, layout.bins, lib, b.id) };
-  })();
+  };
+  const resizeTo = resizeOutcome(resize);
   useEffect(() => {
     if (!resize) return;
     const up = () => {
-      const r = resizeTo;
+      const r = resizeOutcome(resizeRef.current);
       const same = r && r.c && r.c.file === r.b.file && r.c.x === r.b.x && r.c.y === r.b.y && r.c.rot === r.b.rot;
       if (r && r.c && r.ok && !same) editBins((bs) => bs.map((x) => (x.id === r.b.id ? { ...x, ...r.c! } : x)));
       else if (r && !same) toast(t(r.hit ? "No room for that size here" : "There is no bin of that size"));
@@ -371,9 +402,10 @@ export function LayoutTab() {
   useEffect(() => {
     if (!drag) return;
     const up = () => {
-      const b = layout.bins.find((x) => x.id === drag.id);
-      if (b && (b.x !== drag.x || b.y !== drag.y || b.rot !== drag.rot)) {
-        const c = { ...b, x: drag.x, y: drag.y, rot: drag.rot };
+      const dr = dragRef.current ?? drag;
+      const b = layout.bins.find((x) => x.id === dr.id);
+      if (b && (b.x !== dr.x || b.y !== dr.y || b.rot !== dr.rot)) {
+        const c = { ...b, x: dr.x, y: dr.y, rot: dr.rot };
         if (fits(c, lib.get(b.file)!, g, layout.bins, lib, b.id)) editBins((bs) => bs.map((x) => (x.id === b.id ? c : x)));
         else toast(t("No room there"));
       }
@@ -386,15 +418,17 @@ export function LayoutTab() {
 
   const onPlaneMove = (e: ThreeEvent<PointerEvent>) => {
     if (resize) {
-      const box = resizeBox(resize.start, resize.edge, e.point.x / PITCH, e.point.y / PITCH, g.cellsX, g.cellsY);
-      if (box.x !== resize.box.x || box.y !== resize.box.y || box.w !== resize.box.w || box.d !== resize.box.d) setResize({ ...resize, box });
+      const r = resizeRef.current ?? resize;
+      const box = resizeBox(r.start, r.edge, e.point.x / PITCH, e.point.y / PITCH, g.cellsX, g.cellsY);
+      if (box.x !== r.box.x || box.y !== r.box.y || box.w !== r.box.w || box.d !== r.box.d) setResize({ ...r, box });
       return;
     }
-    if (drag) {
-      const b = layout.bins.find((x) => x.id === drag.id)!;
+    const dr = dragRef.current ?? drag;
+    if (dr) {
+      const b = layout.bins.find((x) => x.id === dr.id)!;
       const info = lib.get(b.file)!;
-      const [x, y] = snap(e.point.x - drag.dx, e.point.y - drag.dy, info, drag.rot, g);
-      if (x !== drag.x || y !== drag.y) setDrag({ ...drag, x, y });
+      const [x, y] = snap(e.point.x - dr.dx, e.point.y - dr.dy, info, dr.rot, g);
+      if (x !== dr.x || y !== dr.y) setDrag({ ...dr, x, y });
     } else setHover([e.point.x, e.point.y]);
   };
 
@@ -490,14 +524,15 @@ export function LayoutTab() {
   };
   // drawer height check: a bin's top over the drawer floor = the plate's top - the seat + the bin's own height
   useVolumes(layout.bins.map((b) => b.file));   // fills `heights` for this drawer's bins
-  const topOf = (file: string) => (heights.has(file) ? top - SEAT + heights.get(file)! : null);
+  const topOf = (b: Placed) => (heights.has(b.file) ? top - SEAT + baseOfId(b.id) + heights.get(b.file)! : null);
   const tooTall = layout.height
     ? layout.bins.filter((b) => {
-        const z = topOf(b.file);
+        const z = topOf(b);
         return z !== null && z > layout.height! + 0.01;
       })
     : [];
-  const tallest = Math.max(0, ...layout.bins.map((b) => topOf(b.file) ?? 0));
+  const tallest = Math.max(0, ...layout.bins.map((b) => topOf(b) ?? 0));
+  const floats = floating(layout.bins, lib);
   // the tallest bin height (units) that fits under the drawer: 7 mm per unit plus the stacking lip, measured from a mesh
   const lip = (() => {
     for (const b of layout.bins) {
@@ -506,7 +541,7 @@ export function LayoutTab() {
     }
     return 3.75;   // a 6U bin is 45.75 mm
   })();
-  const maxU = layout.height ? Math.floor((layout.height - (top - SEAT) - lip + 0.01) / 7) : undefined;
+  const maxU = layout.height ? Math.floor((layout.height - (top - SEAT) - editFloor - lip + 0.01) / 7) : undefined;   // on the layer being edited
   const est = (() => {
     let g = 0, mm3 = 0, missing = 0;
     const add = (file: string, count: number, filament?: string) => {
@@ -553,7 +588,7 @@ export function LayoutTab() {
     setParts(addPart(parts, lab.file));
     toast(t("Flex label {w} added", { w: selInfo.w }));
   };
-  const used = layout.bins.reduce((a, b) => {
+  const used = layout.bins.filter((b) => layerOf(b) === 0).reduce((a, b) => {
     const i = lib.get(b.file);
     return a + (i ? i.w * i.d : 0);
   }, 0);
@@ -669,6 +704,7 @@ export function LayoutTab() {
           </div>
           <p className="hint">
             {t("{x} × {y} cells · {n} plate pieces · {p}% filled", { x: g.cellsX, y: g.cellsY, n: plate.segments.length || "–", p: Math.round((used / Math.max(1, g.cellsX * g.cellsY)) * 100) })}
+            {floats.length > 0 && <span className="bad"> · {t("{n} stacked bins have no level footing", { n: floats.length })}</span>}
           </p>
           <div className="row-btns">
             <button className="ghost small" onClick={() => setShowOptions(!showOptions)}>{t(showOptions ? "Hide plate options" : "All plate options")}</button>
@@ -692,7 +728,8 @@ export function LayoutTab() {
             armed={armed}
             onArm={(f) => (setArmed(f), set({ selected: null }))}
             onFill={(cands, max) => {
-              const taken = layout.bins.flatMap((b) => {
+              if (layer > 0) return toast(t("Fill gaps fills the floor: switch to it"));
+              const taken = layout.bins.filter((b) => layerOf(b) === 0).flatMap((b) => {
                 const i = lib.get(b.file);
                 if (!i) return [];
                 const [w, d] = fp(i, b.rot);
@@ -753,11 +790,11 @@ export function LayoutTab() {
         onContextMenu={(e) => e.preventDefault()}
       >
         <Scene theme={theme} controlsRef={controls} plan={plan} onZoom={setPlanZoom} onPointerMissed={() => !armed && !resized.current && set({ selected: null })}>
-          <PointerBridge z={top} onReady={(f) => (toPlane.current = f)} />
+          <PointerBridge z={top + editFloor} onReady={(f) => (toPlane.current = f)} />
           {plate.segments.length > 0 && <PlateMesh segments={plate.segments} layout={pl} colorParts={false} hover={false} baseColor={(layout.plateFilament ?? PLATE_DEFAULT)[1]} />}
           <GridLines g={g} z={top + 0.05} dark={theme === "dark"} />
           <mesh
-            position={[(g.cellsX * PITCH) / 2, (g.cellsY * PITCH) / 2, top]}
+            position={[(g.cellsX * PITCH) / 2, (g.cellsY * PITCH) / 2, top + editFloor]}   // the pointer meets the layer being edited
             onPointerMove={onPlaneMove}
             onPointerOut={() => setHover(null)}
             onClick={(e) => {
@@ -765,7 +802,9 @@ export function LayoutTab() {
               if (!armedInfo) return set({ selected: null });   // a click on the empty plate deselects
               e.stopPropagation();
               const [x, y] = snap(e.point.x, e.point.y, armedInfo, armedRot, g);
-              if (!place({ file: armedInfo.file, x, y, rot: armedRot })) toast(t("No room there"));
+              const c = { file: armedInfo.file, x, y, rot: armedRot, z: layer };
+              if (!place(c))
+                toast(t(layer > 0 && baseFor(c, armedInfo, layout.bins, lib) === null ? "No level footing here: a stacked bin needs bins of equal height under all of it" : "No room there"));
               if (!e.shiftKey) setArmed(null);
             }}
           >
@@ -776,11 +815,14 @@ export function LayoutTab() {
             const info = lib.get(b.file);
             if (!info) return null;
             const moving = drag?.id === b.id;
+            // bins of other layers: the ones below as they are, the ones above faded; neither can be picked
+            if (layerOf(b) !== layer)
+              return <BinMesh key={b.id} file={b.file} at={centre(b, info, baseOfId(b.id))} rot={b.rot} color={binColor(b, info, layout.colorMode)[0]} faded={layerOf(b) > layer} />;
             return (
               <BinMesh
                 key={b.id}
                 file={b.file}
-                at={centre(b, info)}
+                at={centre(b, info, baseOfId(b.id))}
                 rot={b.rot}
                 color={binColor(b, info, layout.colorMode)[0]}
                 selected={inGroup(b.id)}
@@ -802,7 +844,7 @@ export function LayoutTab() {
                   if (armed || e.button !== 0) return;
                   e.stopPropagation();
                   if (e.shiftKey) return toggleSelect(b.id);
-                  const c = centre(b, info);
+                  const c = centre(b, info, baseOfId(b.id));
                   const start = () => {
                     set({ selected: b.id });
                     setDrag({ id: b.id, dx: e.point.x - c.x, dy: e.point.y - c.y, x: b.x, y: b.y, rot: b.rot });
@@ -825,7 +867,7 @@ export function LayoutTab() {
               />
             );
           })}
-          {ghost && <BinMesh key={`ghost-${ghost.file}`} file={ghost.file} at={centre(ghost, lib.get(ghost.file)!)} rot={ghost.rot} color="#fff" ghost valid={ghostOk} />}
+          {ghost && <BinMesh key={`ghost-${ghost.file}`} file={ghost.file} at={centre(ghost, lib.get(ghost.file)!, ghostBase)} rot={ghost.rot} color="#fff" ghost valid={ghostOk} />}
           {/* the drawer's inner height as a faint plane, bins that reach through it framed in red */}
           {layout.height && tooTall.length > 0 && (
             <mesh position={[(g.cellsX * PITCH) / 2, (g.cellsY * PITCH) / 2, layout.height]}>
@@ -837,7 +879,14 @@ export function LayoutTab() {
             const i = lib.get(b.file);
             if (!i) return null;
             const [w, d] = fp(i, b.rot);
-            return <SelectionFrame key={`tall-${b.id}`} x={b.x} y={b.y} w={w} d={d} z={top - SEAT} h={heights.get(b.file) ?? 7 * i.h + 4} color="#ef4444" />;
+            return <SelectionFrame key={`tall-${b.id}`} x={b.x} y={b.y} w={w} d={d} z={top - SEAT + baseOfId(b.id)} h={heights.get(b.file) ?? 7 * i.h + 4} color="#ef4444" />;
+          })}
+          {/* stacked bins left without a level footing (the bin below moved or went) */}
+          {floats.map((id) => {
+            const b = layout.bins.find((x) => x.id === id)!;
+            const i = lib.get(b.file)!;
+            const [w, d] = fp(i, b.rot);
+            return <SelectionFrame key={`float-${id}`} x={b.x} y={b.y} w={w} d={d} z={top - SEAT + baseOfId(id)} h={7 * i.h + 4} color="#f97316" />;
           })}
           {multi &&
             group.slice(1).map((id) => {
@@ -845,12 +894,12 @@ export function LayoutTab() {
               const i = b && lib.get(b.file);
               if (!b || !i) return null;
               const [w, d] = fp(i, b.rot);
-              return <SelectionFrame key={`also-${id}`} x={b.x} y={b.y} w={w} d={d} z={top - SEAT} h={7 * i.h + 4} />;
+              return <SelectionFrame key={`also-${id}`} x={b.x} y={b.y} w={w} d={d} z={top - SEAT + baseOfId(id)} h={7 * i.h + 4} />;
             })}
           {sel && selInfo && !multi && !drag && !armed && !resize && (() => {
             // edge handles on the selected bin: drag one to make the bin longer or shorter
             const [w, d] = fp(selInfo, sel.rot);
-            const z = top - SEAT + 7 * selInfo.h + 6;
+            const z = top - SEAT + baseOfId(sel.id) + 7 * selInfo.h + 6;
             const handles: [Edge, number, number, number][] = [
               ["e", sel.x + w, sel.y + d / 2, 0],
               ["w", sel.x, sel.y + d / 2, 0],
@@ -883,8 +932,8 @@ export function LayoutTab() {
             const { x, y, w, d } = resize.box;
             return (
               <>
-                <SelectionFrame x={x} y={y} w={w} d={d} z={top - SEAT} h={7 * i.h + 4} color={resizeTo.ok ? "#4ade80" : "#f87171"} />
-                <Html position={[(x + w / 2) * PITCH, (y + d / 2) * PITCH, top - SEAT + 7 * i.h + 12]} center zIndexRange={[20, 10]}>
+                <SelectionFrame x={x} y={y} w={w} d={d} z={top - SEAT + baseOfId(resize.id)} h={7 * i.h + 4} color={resizeTo.ok ? "#4ade80" : "#f87171"} />
+                <Html position={[(x + w / 2) * PITCH, (y + d / 2) * PITCH, top - SEAT + baseOfId(resize.id) + 7 * i.h + 12]} center zIndexRange={[20, 10]}>
                   <div className={`size-tag ${resizeTo.ok ? "" : "bad"}`}>{`${w}×${d}×${i.h}`}{!resizeTo.hit && ` · ${t("not in the library")}`}</div>
                 </Html>
               </>
@@ -892,12 +941,12 @@ export function LayoutTab() {
           })()}
           {sel && selInfo && !drag && !resize && (() => {
             const [w, d] = fp(selInfo, sel.rot);
-            return <SelectionFrame x={sel.x} y={sel.y} w={w} d={d} z={top - SEAT} h={7 * selInfo.h + 4} />;
+            return <SelectionFrame x={sel.x} y={sel.y} w={w} d={d} z={top - SEAT + baseOfId(sel.id)} h={7 * selInfo.h + 4} />;
           })()}
           {showLabels &&
             layout.bins.map((b) => {
               const info = lib.get(b.file);
-              if (!b.label || !info || drag?.id === b.id) return null;
+              if (!b.label || !info || drag?.id === b.id || layerOf(b) !== layer) return null;   // labels of the layer being edited
               // zoomed out (a cell under 40 px) only the bins under the pointer or selected keep their label
               const far = PITCH * planZoom < 40;
               if (far && b.id !== hoverBin && !inGroup(b.id)) return null;
@@ -906,7 +955,7 @@ export function LayoutTab() {
               return (
                 <Html
                   key={`label-${b.id}`}
-                  position={[(b.x + w / 2) * PITCH, plan ? (b.y + d / 2) * PITCH : b.y * PITCH + 7, top - SEAT + 7 * info.h + 5]}
+                  position={[(b.x + w / 2) * PITCH, plan ? (b.y + d / 2) * PITCH : b.y * PITCH + 7, top - SEAT + baseOfId(b.id) + 7 * info.h + 5]}
                   center
                   zIndexRange={[10, 0]}
                   distanceFactor={plan || far ? undefined : 420}   // zoomed out: the few left keep a readable size
@@ -921,6 +970,15 @@ export function LayoutTab() {
               );
             })}
         </Scene>
+        {/* layers: the floor, every layer in use, and one more to start (up to four) */}
+        <div className="layers" title={t("Bins can stand on bins: pick the layer to place and edit")}>
+          <span>{t("Layer")}</span>
+          {Array.from({ length: Math.min(4, Math.max(layer, ...layout.bins.map(layerOf)) + 2) }, (_, l) => (
+            <button key={l} className={l === layer ? "on" : ""} onClick={() => (setLayer(l), set({ selected: null }), setArmed(null))}>
+              {l === 0 ? t("Floor") : l + 1}
+            </button>
+          ))}
+        </div>
         <ViewButtons onView={view} name={layoutPreset} fallback="layout" onHelp={() => setHelp(true)} plan={plan} onPlan={() => setPlan(!plan)} />
         {help && <Shortcuts onClose={() => setHelp(false)} />}
         {menu && sel && (
@@ -1186,20 +1244,22 @@ export function LayoutTab() {
               disabled={!inScope.some((d) => d.layout.bins.length)}
               title={t("A top view of each drawer with every bin's label, to print and stick inside the cabinet")}
               onClick={() => {
-                const maps = inScope.map((d) => {
+                // one page per drawer, and per layer when bins are stacked
+                const maps = inScope.flatMap((d) => {
                   const dg = grid((n) => value(d.layout.plate, schema, n));
-                  return {
-                    name: d.name,
+                  const layers = [...new Set(d.layout.bins.map(layerOf))].sort();
+                  return (layers.length ? layers : [0]).map((l) => ({
+                    name: layers.length > 1 ? `${d.name} · ${l === 0 ? t("Floor") : `${t("Layer")} ${l + 1}`}` : d.name,
                     cellsX: dg.cellsX,
                     cellsY: dg.cellsY,
                     sizeMm: dg.size,
-                    bins: d.layout.bins.flatMap((b) => {
+                    bins: d.layout.bins.filter((b) => layerOf(b) === l).flatMap((b) => {
                       const info = lib.get(b.file);
                       if (!info) return [];
                       const [w, dd] = fp(info, b.rot);
                       return [{ x: b.x, y: b.y, w, d: dd, color: binColor(b, info, d.layout.colorMode)[0], text: b.label ?? "", size: `${info.w}×${info.d}×${info.h}` }];
                     }),
-                  };
+                  }));
                 });
                 const html = drawerMapHtml(layoutPreset ?? t("Drawer map"), maps, { front: t("front"), bins: t("bins"), empty: t("No bins yet"), cards: t("Cards for the drawer fronts") });
                 const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));

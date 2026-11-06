@@ -4,22 +4,28 @@ import type { BinFile } from "../api";
 import type { Placed } from "../store";
 import { PITCH, type Grid } from "./grid";
 
-export type Cand = { file: string; x: number; y: number; rot: 0 | 1 };
+export type Cand = { file: string; x: number; y: number; rot: 0 | 1; z?: number };   // z: the layer, 0 = floor
 type Cells = Pick<Grid, "cellsX" | "cellsY">;
-type Size = Pick<BinFile, "w" | "d">;
+type Size = Pick<BinFile, "w" | "d"> & { h?: number };
+
+export const layerOf = (b: { z?: number }) => b.z ?? 0;
+export const STACK_PITCH = 7;   // mm per height unit: a bin on top stands 7 mm × h higher than the one below
 
 // footprint [w, d] in cells as placed
 export const fp = (b: Size, rot: 0 | 1) => (rot ? [b.d, b.w] : [b.w, b.d]);
 export const whole = (b: Size) => Number.isInteger(b.w) && Number.isInteger(b.d);
 
-// does candidate c fit: inside the grid, on whole cells if it must be, overlapping no other bin (but `ignore`)
+// does candidate c fit: inside the grid, on whole cells if it must be, overlapping no other bin of its layer (but
+// `ignore`), and on a layer above the floor standing fully on bins below whose tops are level
 export function fits(c: Cand, info: Size, g: Cells, bins: Placed[], lib: Map<string, Size>, ignore?: string) {
   const [w, d] = fp(info, c.rot);
   const e = 1e-6;
   if (c.x < -e || c.y < -e || c.x + w > g.cellsX + e || c.y + d > g.cellsY + e) return false;
   if (whole(info) && (!Number.isInteger(c.x) || !Number.isInteger(c.y))) return false;   // full-pitch feet sit on whole cells
+  const layer = layerOf(c);
+  if (layer > 0 && baseFor(c, info, bins, lib, ignore) === null) return false;
   for (const o of bins) {
-    if (o.id === ignore) continue;
+    if (o.id === ignore || layerOf(o) !== layer) continue;
     const oi = lib.get(o.file);
     if (!oi) continue;
     const [ow, od] = fp(oi, o.rot);
@@ -43,7 +49,7 @@ export function snap(px: number, py: number, info: Size, rot: 0 | 1, g: Cells): 
 // front left; null if there is none
 export function copySpot(b: Placed, info: Size, g: Cells, bins: Placed[], lib: Map<string, Size>): Cand | null {
   const [w, d] = fp(info, b.rot);
-  const at = (x: number, y: number): Cand => ({ file: b.file, x, y, rot: b.rot });
+  const at = (x: number, y: number): Cand => ({ file: b.file, x, y, rot: b.rot, z: b.z });
   for (const [dx, dy] of [[w, 0], [0, d], [-w, 0], [0, -d]]) if (fits(at(b.x + dx, b.y + dy), info, g, bins, lib)) return at(b.x + dx, b.y + dy);
   const st = whole(info) ? 1 : 0.5;
   for (let y = 0; y <= g.cellsY; y += st) for (let x = 0; x <= g.cellsX; x += st) if (fits(at(x, y), info, g, bins, lib)) return at(x, y);
@@ -95,4 +101,50 @@ export function arrowAxes(fx: number, fy: number): Record<"ArrowUp" | "ArrowDown
   const right = v(up[1], -up[0]);
   const neg = (a: [number, number]) => v(-a[0], -a[1]);
   return { ArrowUp: up, ArrowDown: neg(up), ArrowRight: right, ArrowLeft: neg(right) };
+}
+
+// Where a bin on a layer above the floor stands: the height (mm above the floor bins' bottom) of the level tops of the
+// bins right below it that carry its whole footprint, or null if they do not (a gap, or tops at different heights)
+export function baseFor(c: Cand, info: Size, bins: Placed[], lib: Map<string, Size>, ignore?: string): number | null {
+  const layer = layerOf(c);
+  if (layer === 0) return 0;
+  const [w, d] = fp(info, c.rot);
+  let covered = 0;
+  const tops: number[] = [];
+  for (const o of bins) {
+    if (o.id === ignore || layerOf(o) !== layer - 1) continue;
+    const oi = lib.get(o.file);
+    if (!oi) continue;
+    const [ow, od] = fp(oi, o.rot);
+    const ox = Math.min(c.x + w, o.x + ow) - Math.max(c.x, o.x), oy = Math.min(c.y + d, o.y + od) - Math.max(c.y, o.y);
+    if (ox <= 1e-6 || oy <= 1e-6) continue;
+    covered += ox * oy;
+    tops.push(baseOf(o, bins, lib) + STACK_PITCH * (oi.h ?? 0));
+  }
+  if (Math.abs(covered - w * d) > 1e-6 || !tops.length) return null;
+  return tops.every((t) => Math.abs(t - tops[0]) < 0.01) ? tops[0] : null;
+}
+
+// where a placed bin stands (mm above the floor); a floating one is drawn on the highest bin below it, or on the floor
+export function baseOf(b: Placed, bins: Placed[], lib: Map<string, Size>): number {
+  if (layerOf(b) === 0) return 0;
+  const info = lib.get(b.file);
+  if (!info) return 0;
+  const base = baseFor(b, info, bins, lib, b.id);
+  if (base !== null) return base;
+  const [w, d] = fp(info, b.rot);
+  let best = 0;
+  for (const o of bins) {
+    if (layerOf(o) !== layerOf(b) - 1) continue;
+    const oi = lib.get(o.file);
+    if (!oi) continue;
+    const [ow, od] = fp(oi, o.rot);
+    if (b.x < o.x + ow && o.x < b.x + w && b.y < o.y + od && o.y < b.y + d) best = Math.max(best, baseOf(o, bins, lib) + STACK_PITCH * (oi.h ?? 0));
+  }
+  return best;
+}
+
+// the bins above the floor that are not carried as they should be (after the bin below was moved or removed)
+export function floating(bins: Placed[], lib: Map<string, Size>): string[] {
+  return bins.filter((b) => layerOf(b) > 0 && lib.has(b.file) && baseFor(b, lib.get(b.file)!, bins, lib, b.id) === null).map((b) => b.id);
 }

@@ -26,6 +26,9 @@ onto it, and download everything as STL files or as a Bambu Studio project with 
   each line gets a suggested bin (size and height guessed from the words, the count and a length in cm, English and
   German), you check the guesses, and the bins are placed and labelled in the drawer; what does not fit goes into a
   new drawer.
+- **Stacking**: bins can stand on bins. Pick a layer (Floor, 2, 3, 4) and place on top of the bins below; a stacked bin
+  needs bins of equal height under its whole footprint. Other layers are shown faded, the drawer height check counts the
+  whole stack, and the drawer map has a page per layer.
 - **Your own bins**: drop any Gridfinity STL onto the plate (or into the Community section). It is centred, measured
   against the grid and added to the library on the server with your name, for everyone using that installation.
 - **Engraved labels**: every labelled flex bin gets its flex label with the text engraved (sized to fit), in the print

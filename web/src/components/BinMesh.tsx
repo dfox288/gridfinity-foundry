@@ -33,13 +33,14 @@ export function useBinGeometry(file: string | null) {
 }
 
 // A bin standing on the plate. `at` is its centre on the plate top; it drops in when it first appears.
-export function BinMesh({ file, at, rot, color, selected, hovered, ghost, valid = true, onPointerDown, onClick, onDoubleClick, onPointerOver, onPointerOut, onContextMenu }: {
+export function BinMesh({ file, at, rot, color, selected, hovered, faded, ghost, valid = true, onPointerDown, onClick, onDoubleClick, onPointerOver, onPointerOut, onContextMenu }: {
   file: string;
   at: THREE.Vector3;
   rot: 0 | 1;
   color: string;
   selected?: boolean;
   hovered?: boolean;
+  faded?: boolean;    // a bin of a layer above the one being edited: see-through
   ghost?: boolean;
   valid?: boolean;
   onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
@@ -61,14 +62,14 @@ export function BinMesh({ file, at, rot, color, selected, hovered, ghost, valid 
   return (
     <group ref={ref} rotation={[0, 0, rot ? Math.PI / 2 : 0]} onPointerDown={onPointerDown} onClick={onClick} onDoubleClick={onDoubleClick} onPointerOver={onPointerOver} onPointerOut={onPointerOut} onContextMenu={onContextMenu}>
       {geo ? (
-        <mesh geometry={geo} castShadow={!ghost} receiveShadow={!ghost}>
+        <mesh geometry={geo} castShadow={!ghost && !faded} receiveShadow={!ghost} raycast={faded ? () => null : undefined}>
           <meshStandardMaterial
             color={c}
             roughness={0.5}
             metalness={0.04}
-            transparent={ghost}
-            opacity={ghost ? 0.45 : 1}
-            depthWrite={!ghost}
+            transparent={ghost || faded}
+            opacity={ghost ? 0.45 : faded ? 0.16 : 1}
+            depthWrite={!ghost && !faded}
             emissive={selected || hovered ? "#ffffff" : c}
             emissiveIntensity={selected ? 0.18 : hovered ? 0.09 : ghost ? 0.35 : 0}
           />

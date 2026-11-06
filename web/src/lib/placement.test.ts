@@ -124,3 +124,36 @@ describe("arrowAxes", () => {
     expect(arrowAxes(0.1, -1).ArrowRight).toEqual([-1, 0]);
   });
 });
+
+import { baseFor, baseOf, floating } from "./placement";
+
+describe("stacking", () => {
+  const lib = new Map([
+    ["1x1x3", { w: 1, d: 1, h: 3 }],
+    ["1x1x6", { w: 1, d: 1, h: 6 }],
+    ["2x1x3", { w: 2, d: 1, h: 3 }],
+  ]);
+  const g = { cellsX: 5, cellsY: 5 };
+  const p = (id: string, file: string, x: number, y: number, z = 0): Placed => ({ id, file, x, y, rot: 0, z });
+  it("bins on different layers do not collide", () => {
+    const bins = [p("a", "1x1x3", 0, 0), p("b", "1x1x3", 1, 0)];
+    expect(fits({ file: "2x1x3", x: 0, y: 0, rot: 0, z: 1 }, { w: 2, d: 1, h: 3 }, g, bins, lib)).toBe(true);
+    expect(fits({ file: "2x1x3", x: 0, y: 0, rot: 0 }, { w: 2, d: 1, h: 3 }, g, bins, lib)).toBe(false);
+  });
+  it("a stacked bin needs its whole footprint carried by level tops", () => {
+    const bins = [p("a", "1x1x3", 0, 0), p("b", "1x1x6", 1, 0), p("c", "1x1x3", 3, 0)];
+    expect(baseFor({ file: "1x1x3", x: 0, y: 0, rot: 0, z: 1 }, { w: 1, d: 1 }, bins, lib)).toBe(21);
+    expect(baseFor({ file: "2x1x3", x: 0, y: 0, rot: 0, z: 1 }, { w: 2, d: 1 }, bins, lib)).toBeNull();   // 3U next to 6U
+    expect(baseFor({ file: "2x1x3", x: 3, y: 0, rot: 0, z: 1 }, { w: 2, d: 1 }, bins, lib)).toBeNull();   // half over nothing
+    expect(fits({ file: "1x1x3", x: 2, y: 0, rot: 0, z: 1 }, { w: 1, d: 1, h: 3 }, g, bins, lib)).toBe(false);   // over nothing
+  });
+  it("heights add up over layers", () => {
+    const bins = [p("a", "1x1x6", 0, 0), p("b", "1x1x3", 0, 0, 1), p("c", "1x1x3", 0, 0, 2)];
+    expect(baseOf(bins[1], bins, lib)).toBe(42);
+    expect(baseOf(bins[2], bins, lib)).toBe(63);
+  });
+  it("finds bins left floating", () => {
+    const bins = [p("b", "1x1x3", 0, 0, 1), p("c", "1x1x3", 2, 2)];
+    expect(floating(bins, lib)).toEqual(["b"]);
+  });
+});

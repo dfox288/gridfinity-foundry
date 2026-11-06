@@ -56,3 +56,12 @@ export async function planView(page: Page) {
       }),
   );
 }
+
+// a click on the 3D view as a person makes it: the pointer arrives first (the scene picks up what is under it), then
+// the button; an instant move-and-click is sometimes not seen by the scene
+export async function clickAt(page: Page, [x, y]: [number, number], button: "left" | "right" = "left") {
+  await page.mouse.move(x, y);
+  await page.waitForTimeout(250);
+  await page.mouse.down({ button });
+  await page.mouse.up({ button });
+}
