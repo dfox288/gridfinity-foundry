@@ -13,6 +13,11 @@ const DE: Record<string, string> = {
   "Loading GridFlock…": "GridFlock wird geladen…",
   // share links
   Share: "Teilen",
+  "No room for that size here": "Für diese Größe ist hier kein Platz",
+  "There is no bin of that size": "Eine Box dieser Größe gibt es nicht",
+  "not in the library": "nicht in der Bibliothek",
+  "drag an orange edge handle": "einen orangen Griff an der Kante ziehen",
+  "resize the selected bin": "die gewählte Box größer oder kleiner machen",
   Plan: "Plan",
   "Plan: flat from above for arranging, drag pans (4)": "Plan: flach von oben zum Anordnen, Ziehen verschiebt (4)",
   "plan view: flat from above, drag the empty plate to pan": "Planansicht: flach von oben, leere Platte ziehen verschiebt",

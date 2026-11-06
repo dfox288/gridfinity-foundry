@@ -49,3 +49,39 @@ export function copySpot(b: Placed, info: Size, g: Cells, bins: Placed[], lib: M
   for (let y = 0; y <= g.cellsY; y += st) for (let x = 0; x <= g.cellsX; x += st) if (fits(at(x, y), info, g, bins, lib)) return at(x, y);
   return null;
 }
+
+export type Edge = "e" | "w" | "n" | "s";
+export interface Box {
+  x: number;
+  y: number;
+  w: number;   // footprint as placed, cells
+  d: number;
+}
+
+// a box resized by dragging one edge to the pointer (cx, cy in cells); half-cell steps, at least half a cell, the
+// opposite edge stays put
+export function resizeBox(b: Box, edge: Edge, cx: number, cy: number, cellsX: number, cellsY: number): Box {
+  const h = (v: number) => Math.round(v * 2) / 2;
+  if (edge === "e") return { ...b, w: Math.min(Math.max(0.5, h(cx - b.x)), cellsX - b.x) };
+  if (edge === "n") return { ...b, d: Math.min(Math.max(0.5, h(cy - b.y)), cellsY - b.y) };
+  if (edge === "w") {
+    const right = b.x + b.w;
+    const x = Math.max(0, Math.min(right - 0.5, h(cx)));
+    return { ...b, x, w: right - x };
+  }
+  const back = b.y + b.d;
+  const y = Math.max(0, Math.min(back - 0.5, h(cy)));
+  return { ...b, y, d: back - y };
+}
+
+// the library bin of the same system, kind and height with footprint (w, d) as placed, and how it is turned;
+// library sizes are listed long side first, so a deeper than wide footprint is a turned bin
+export function sameKindSized(library: BinFile[], like: BinFile, w: number, d: number): { file: BinFile; rot: 0 | 1 } | null {
+  const e = 1e-6;
+  const hit = library.find(
+    (b) => b.type === "bin" && b.system === like.system && b.kind === like.kind && b.h === like.h &&
+      ((Math.abs(b.w - w) < e && Math.abs(b.d - d) < e) || (Math.abs(b.w - d) < e && Math.abs(b.d - w) < e)),
+  );
+  if (!hit) return null;
+  return { file: hit, rot: Math.abs(hit.w - w) < e && Math.abs(hit.d - d) < e ? 0 : 1 };
+}

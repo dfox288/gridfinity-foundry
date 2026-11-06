@@ -73,3 +73,37 @@ describe("copySpot", () => {
     expect(copySpot(b, { w: 1, d: 1 }, tiny, [b], lib)).toBeNull();
   });
 });
+
+import { resizeBox, sameKindSized } from "./placement";
+import type { BinFile } from "../api";
+
+describe("resizeBox", () => {
+  const b = { x: 1, y: 1, w: 2, d: 1 };
+  it("moves the east edge to the pointer in half steps", () => {
+    expect(resizeBox(b, "e", 4.2, 0, 5, 8)).toEqual({ x: 1, y: 1, w: 3, d: 1 });
+    expect(resizeBox(b, "e", 2.7, 0, 5, 8)).toEqual({ x: 1, y: 1, w: 1.5, d: 1 });
+  });
+  it("keeps the opposite edge when dragging west or south", () => {
+    expect(resizeBox(b, "w", 0, 0, 5, 8)).toEqual({ x: 0, y: 1, w: 3, d: 1 });
+    expect(resizeBox(b, "s", 0, 0.4, 5, 8)).toEqual({ x: 1, y: 0.5, w: 2, d: 1.5 });
+  });
+  it("never goes below half a cell or past the grid", () => {
+    expect(resizeBox(b, "e", -3, 0, 5, 8).w).toBe(0.5);
+    expect(resizeBox(b, "e", 99, 0, 5, 8).w).toBe(4);
+    expect(resizeBox(b, "w", 99, 0, 5, 8)).toMatchObject({ x: 2.5, w: 0.5 });
+  });
+});
+
+describe("sameKindSized", () => {
+  const mk = (w: number, d: number, h = 6, kind = "hex") => ({ file: `${kind}-${w}x${d}x${h}`, type: "bin", system: "groove", kind, w, d, h, bytes: 0 }) as BinFile;
+  const library = [mk(1, 1), mk(2, 1), mk(3, 2), mk(2, 1, 9), mk(2, 1, 6, "solid")];
+  it("finds the same kind and height in the new size", () => {
+    expect(sameKindSized(library, mk(1, 1), 2, 1)).toEqual({ file: mk(2, 1), rot: 0 });
+  });
+  it("turns it when the footprint is deeper than wide", () => {
+    expect(sameKindSized(library, mk(1, 1), 2, 3)).toEqual({ file: mk(3, 2), rot: 1 });
+  });
+  it("gives null for a size the library does not have", () => {
+    expect(sameKindSized(library, mk(1, 1), 5, 5)).toBeNull();
+  });
+});

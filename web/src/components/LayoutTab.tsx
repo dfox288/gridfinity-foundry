@@ -27,7 +27,7 @@ import { HeightPicker } from "./HeightPicker";
 import { ViewButtons } from "./ViewButtons";
 import { FindBin } from "./FindBin";
 import { MOD, Shortcuts } from "./Shortcuts";
-import { type Cand, copySpot, fits, fp, snap, whole } from "../lib/placement";
+import { type Box, type Cand, copySpot, type Edge, fits, fp, resizeBox, sameKindSized, snap, whole } from "../lib/placement";
 
 const FLEX_FIT = 0.2;   // flex label press fit (mm, total): holds in every groove bin width
 
@@ -266,6 +266,10 @@ export function LayoutTab() {
   const [hover, setHover] = useState<[number, number] | null>(null);
   const [drag, setDrag] = useState<{ id: string; dx: number; dy: number; x: number; y: number; rot: 0 | 1 } | null>(null);
   const [hoverBin, setHoverBin] = useState<string | null>(null);
+  // a bin being resized by one of its edge handles: the box as it would become
+  const [resize, setResize] = useState<{ id: string; edge: Edge; start: Box; box: Box } | null>(null);
+  const [hoverEdge, setHoverEdge] = useState<Edge | null>(null);
+  const resized = useRef(false);   // the click that ends a resize is not a click on the empty plate
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);   // the bin's right-click menu, at the pointer
   const [help, setHelp] = useState(false);
   const [plan, setPlan] = useState(false);   // the flat plan view (orthographic, from above)
@@ -403,12 +407,13 @@ export function LayoutTab() {
 
   // the pointer says what a click does: grab a bin, grabbing while dragging, place while a size is armed
   useEffect(() => {
-    const cur = drag ? "grabbing" : armed ? "crosshair" : hoverBin ? "grab" : "";
+    const edgeCur = (e: Edge | null) => (e === "e" || e === "w" ? "ew-resize" : e ? "ns-resize" : "");
+    const cur = resize ? edgeCur(resize.edge) : drag ? "grabbing" : armed ? "crosshair" : hoverEdge ? edgeCur(hoverEdge) : hoverBin ? "grab" : "";
     document.body.style.cursor = cur;
     return () => {
       document.body.style.cursor = "";
     };
-  }, [drag, armed, hoverBin]);
+  }, [drag, armed, hoverBin, resize, hoverEdge]);
 
   // keyboard
   useEffect(() => {
@@ -483,6 +488,32 @@ export function LayoutTab() {
     setMenu({ x: at.x, y: at.y });
   }
 
+  // the bin a resize would give: the library's bin of that size (same system, kind, height), whether it fits there
+  const resizeTo = (() => {
+    if (!resize) return null;
+    const b = layout.bins.find((x) => x.id === resize.id);
+    const info = b && lib.get(b.file);
+    if (!b || !info) return null;
+    const hit = sameKindSized(library, info, resize.box.w, resize.box.d);
+    const c = hit ? { file: hit.file.file, x: resize.box.x, y: resize.box.y, rot: hit.rot } : null;
+    return { b, hit, c, ok: !!c && !!hit && fits(c, hit.file, g, layout.bins, lib, b.id) };
+  })();
+  useEffect(() => {
+    if (!resize) return;
+    const up = () => {
+      const r = resizeTo;
+      const same = r && r.c && r.c.file === r.b.file && r.c.x === r.b.x && r.c.y === r.b.y && r.c.rot === r.b.rot;
+      if (r && r.c && r.ok && !same) editBins((bs) => bs.map((x) => (x.id === r.b.id ? { ...x, ...r.c! } : x)));
+      else if (r && !same) toast(t(r.hit ? "No room for that size here" : "There is no bin of that size"));
+      setResize(null);
+      resized.current = true;
+      setTimeout(() => (resized.current = false), 0);
+      if (controls.current) controls.current.enabled = true;
+    };
+    window.addEventListener("pointerup", up);
+    return () => window.removeEventListener("pointerup", up);
+  });
+
   // finish a drag anywhere
   useEffect(() => {
     if (!drag) return;
@@ -501,6 +532,11 @@ export function LayoutTab() {
   }, [drag, layout.bins, lib, g, editBins]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onPlaneMove = (e: ThreeEvent<PointerEvent>) => {
+    if (resize) {
+      const box = resizeBox(resize.start, resize.edge, e.point.x / PITCH, e.point.y / PITCH, g.cellsX, g.cellsY);
+      if (box.x !== resize.box.x || box.y !== resize.box.y || box.w !== resize.box.w || box.d !== resize.box.d) setResize({ ...resize, box });
+      return;
+    }
     if (drag) {
       const b = layout.bins.find((x) => x.id === drag.id)!;
       const info = lib.get(b.file)!;
@@ -859,7 +895,7 @@ export function LayoutTab() {
         onPointerLeave={() => setHover(null)}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <Scene theme={theme} controlsRef={controls} plan={plan} onZoom={setPlanZoom} onPointerMissed={() => !armed && set({ selected: null })}>
+        <Scene theme={theme} controlsRef={controls} plan={plan} onZoom={setPlanZoom} onPointerMissed={() => !armed && !resized.current && set({ selected: null })}>
           <PointerBridge z={top} onReady={(f) => (toPlane.current = f)} />
           {plate.segments.length > 0 && <PlateMesh segments={plate.segments} layout={pl} colorParts={false} hover={false} baseColor={(layout.plateFilament ?? PLATE_DEFAULT)[1]} />}
           <GridLines g={g} z={top + 0.05} dark={theme === "dark"} />
@@ -868,7 +904,7 @@ export function LayoutTab() {
             onPointerMove={onPlaneMove}
             onPointerOut={() => setHover(null)}
             onClick={(e) => {
-              if (drag) return;
+              if (drag || resized.current) return;
               if (!armedInfo) return set({ selected: null });   // a click on the empty plate deselects
               e.stopPropagation();
               const [x, y] = snap(e.point.x, e.point.y, armedInfo, armedRot, g);
@@ -940,7 +976,50 @@ export function LayoutTab() {
               const [w, d] = fp(i, b.rot);
               return <SelectionFrame key={`also-${id}`} x={b.x} y={b.y} w={w} d={d} z={top - SEAT} h={7 * i.h + 4} />;
             })}
-          {sel && selInfo && !drag && (() => {
+          {sel && selInfo && !multi && !drag && !armed && !resize && (() => {
+            // edge handles on the selected bin: drag one to make the bin longer or shorter
+            const [w, d] = fp(selInfo, sel.rot);
+            const z = top - SEAT + 7 * selInfo.h + 6;
+            const handles: [Edge, number, number, number][] = [
+              ["e", sel.x + w, sel.y + d / 2, 0],
+              ["w", sel.x, sel.y + d / 2, 0],
+              ["n", sel.x + w / 2, sel.y + d, 1],
+              ["s", sel.x + w / 2, sel.y, 1],
+            ];
+            return handles.map(([edge, hx, hy, turn]) => (
+              <mesh
+                key={edge}
+                position={[hx * PITCH, hy * PITCH, z]}
+                rotation={[0, 0, turn ? Math.PI / 2 : 0]}
+                onPointerOver={(e) => (e.stopPropagation(), setHoverEdge(edge))}
+                onPointerOut={() => setHoverEdge((h) => (h === edge ? null : h))}
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  e.stopPropagation();
+                  const box = { x: sel.x, y: sel.y, w, d };
+                  setResize({ id: sel.id, edge, start: box, box });
+                  setHoverEdge(null);
+                  if (controls.current) controls.current.enabled = false;
+                }}
+              >
+                <boxGeometry args={[7, 22, 5]} />
+                <meshBasicMaterial color={hoverEdge === edge ? "#ffffff" : "#f5a524"} toneMapped={false} />
+              </mesh>
+            ));
+          })()}
+          {resize && resizeTo && (() => {
+            const i = lib.get(resizeTo.b.file)!;
+            const { x, y, w, d } = resize.box;
+            return (
+              <>
+                <SelectionFrame x={x} y={y} w={w} d={d} z={top - SEAT} h={7 * i.h + 4} color={resizeTo.ok ? "#4ade80" : "#f87171"} />
+                <Html position={[(x + w / 2) * PITCH, (y + d / 2) * PITCH, top - SEAT + 7 * i.h + 12]} center zIndexRange={[20, 10]}>
+                  <div className={`size-tag ${resizeTo.ok ? "" : "bad"}`}>{`${w}×${d}×${i.h}`}{!resizeTo.hit && ` · ${t("not in the library")}`}</div>
+                </Html>
+              </>
+            );
+          })()}
+          {sel && selInfo && !drag && !resize && (() => {
             const [w, d] = fp(selInfo, sel.rot);
             return <SelectionFrame x={sel.x} y={sel.y} w={w} d={d} z={top - SEAT} h={7 * selInfo.h + 4} />;
           })()}

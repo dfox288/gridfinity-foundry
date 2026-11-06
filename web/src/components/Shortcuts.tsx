@@ -12,6 +12,7 @@ export function Shortcuts({ onClose }: { onClose: () => void }) {
     [t("Drag a bin"), t("move it")],
     ["R", t("turn the selected bin, or the one being dragged or placed")],
     [t("Arrow keys"), t("move the selection")],
+    [t("drag an orange edge handle"), t("resize the selected bin")],
     [`${M}+D`, t("copy beside it")],
     ["Del", t("remove the selection")],
     [t("Shift-click"), t("add a bin to the selection or take it out")],
