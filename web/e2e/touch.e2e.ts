@@ -30,7 +30,8 @@ test("holding a bin picks it up, dragging moves it", async ({ page }) => {
   const p = await toScreen(page, 1.5, 1.5, top);
   const q = await toScreen(page, 2.5, 2.5, top);
   await finger(page, "pointerdown", p);
-  await page.waitForTimeout(500);
+  // wait for the pick-up itself: with software rendering the 350 ms timer can fire much later than 350 ms
+  await page.waitForFunction(() => document.body.style.cursor === "grabbing", null, { timeout: 5000 });
   for (let i = 1; i <= 6; i++) await finger(page, "pointermove", [p[0] + ((q[0] - p[0]) * i) / 6, p[1] + ((q[1] - p[1]) * i) / 6]);
   await finger(page, "pointerup", q);
   await page.waitForTimeout(200);
