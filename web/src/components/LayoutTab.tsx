@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useThree, type ThreeEvent } from "@react-three/fiber";
+import { type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import { api, bambuProject, download, fileName, type BinFile, type ParamValue } from "../api";
-import { grid, PITCH, type Grid } from "../lib/grid";
+import { grid, PITCH } from "../lib/grid";
 import { usePlate } from "../lib/usePlate";
 import { fmtGrams, grams, heights, metres, useVolumes } from "../lib/filament";
 import { meshVolume } from "../lib/stl";
 import { fill } from "../lib/fill";
 import { drawerMapHtml } from "../lib/drawerMap";
 import { EXAMPLES, exampleProject } from "../lib/examples";
-import { canChange, DEFAULT_LAYOUT, loadProject, newId, project, toProject, useStore, value, type Layout, type PartLine, type Placed } from "../store";
+import { DEFAULT_LAYOUT, loadProject, newId, project, toProject, useStore, value, type PartLine, type Placed } from "../store";
 import { FURNITURE } from "../lib/furniture";
 import { DrawerTabs } from "./DrawerTabs";
 import { BAMBU, filamentName } from "../lib/bambu";
@@ -18,234 +18,22 @@ import { BinMesh } from "./BinMesh";
 import { ParamPanel } from "./ParamPanel";
 import { PlateMesh, plateLayout } from "./PlateMesh";
 import { useT } from "../lib/i18n";
-import { creatorName, uploadBins } from "../lib/upload";
+import { uploadBins } from "../lib/upload";
 import { addPart, PART_DEFAULT, partName, PartRows, PartsLibrary } from "./Parts";
 import { PresetBar } from "./PresetBar";
 import { PrinterPicker } from "./PrinterPicker";
 import { fitView, Scene, type Controls } from "./Scene";
-import { HeightPicker } from "./HeightPicker";
 import { ViewButtons } from "./ViewButtons";
 import { FindBin } from "./FindBin";
 import { MOD, Shortcuts } from "./Shortcuts";
 import { arrowAxes, type Box, type Cand, copySpot, type Edge, fits, fp, resizeBox, sameKindSized, snap, whole } from "../lib/placement";
 
 const FLEX_FIT = 0.2;   // flex label press fit (mm, total): holds in every groove bin width
+import { binColor, PLATE_DEFAULT } from "../lib/colors";
+import { GridLines, PointerBridge, SelectionFrame } from "./SceneParts";
+import { Library } from "./Library";
 
-// default colours, all Bambu PLA Basic: [hex, name]
-const HEIGHT_COLORS: Record<number, [string, string]> = {
-  3: ["#0086D6", "Cyan"], 4: ["#00B1B7", "Turquoise"], 5: ["#00AE42", "Bambu Green"], 6: ["#FEC600", "Sunflower Yellow"],
-  7: ["#FF9016", "Pumpkin Orange"], 8: ["#EC008C", "Magenta"], 9: ["#5E43B7", "Purple"], 10: ["#C12E1F", "Red"],
-  11: ["#BECF00", "Bright Green"], 12: ["#FF6A13", "Orange"], 13: ["#F55A74", "Pink"], 14: ["#0056B8", "Cobalt Blue"],
-  15: ["#3F8E43", "Mistletoe Green"], 16: ["#9D432C", "Brown"], 17: ["#482960", "Indigo Purple"], 18: ["#9D2235", "Maroon Red"],
-};
-const SYSTEM_COLORS: Record<string, [string, string]> = { groove: ["#0056B8", "Cobalt Blue"], click: ["#FF6A13", "Orange"], community: ["#00AE42", "Bambu Green"] };
-const PLATE_DEFAULT: [string, string] = ["PLA Basic · Gray", "#8E9089"];
 const SEAT = 4.4;   // a bin's bottom below the plate top
-
-// a bin's colour and the filament it stands for
-function binColor(b: Placed, info: BinFile | undefined, mode: Layout["colorMode"]): [string, string] {
-  if (mode === "custom" && b.color) return [b.color, b.filament ?? ""];
-  const c = mode === "system" ? SYSTEM_COLORS[info?.system ?? ""] : HEIGHT_COLORS[info?.h ?? 6];
-  return c ? [c[0], `PLA Basic · ${c[1]}`] : ["#94a3b8", ""];
-}
-
-// Registers a function that turns screen coordinates into a point on the plate's top plane
-function PointerBridge({ z, onReady }: { z: number; onReady: (f: (x: number, y: number) => THREE.Vector3 | null) => void }) {
-  const { camera, gl } = useThree();
-  useEffect(() => {
-    const ray = new THREE.Raycaster(), plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -z);
-    onReady((cx, cy) => {
-      const r = gl.domElement.getBoundingClientRect();
-      ray.setFromCamera(new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1), camera);
-      return ray.ray.intersectPlane(plane, new THREE.Vector3());
-    });
-  }, [camera, gl, z, onReady]);
-  return null;
-}
-
-function GridLines({ g, z, dark }: { g: Grid; z: number; dark: boolean }) {
-  const geo = useMemo(() => {
-    const pts: number[] = [];
-    const xs = [0], ys = [0];
-    g.traceX.forEach((t) => xs.push(xs[xs.length - 1] + t));
-    g.traceY.forEach((t) => ys.push(ys[ys.length - 1] + t));
-    for (const x of xs) pts.push(x * PITCH, 0, z, x * PITCH, ys[ys.length - 1] * PITCH, z);
-    for (const y of ys) pts.push(0, y * PITCH, z, xs[xs.length - 1] * PITCH, y * PITCH, z);
-    const b = new THREE.BufferGeometry();
-    b.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-    return b;
-  }, [g, z]);
-  return (
-    <lineSegments geometry={geo}>
-      <lineBasicMaterial color={dark ? "#64748b" : "#475569"} transparent opacity={0.35} />
-    </lineSegments>
-  );
-}
-
-function SelectionFrame({ x, y, w, d, z, h, color = "#ffffff" }: { x: number; y: number; w: number; d: number; z: number; h: number; color?: string }) {
-  const geo = useMemo(() => new THREE.EdgesGeometry(new THREE.BoxGeometry(w * PITCH + 2, d * PITCH + 2, h + 2)), [w, d, h]);
-  return (
-    <lineSegments geometry={geo} position={[(x + w / 2) * PITCH, (y + d / 2) * PITCH, z + h / 2]}>
-      <lineBasicMaterial color={color} transparent opacity={0.9} />
-    </lineSegments>
-  );
-}
-
-function Library({ armed, onArm, onFill, maxU }: { armed: string | null; onArm: (f: string | null) => void; onFill: (bins: BinFile[], max: [number, number]) => void; maxU?: number }) {
-  const bins = useStore((s) => s.bins);
-  useStore((s) => s.me);   // re-render on sign-in (canChange)
-  const t = useT();
-  const [system, setSystem] = useState("groove");
-  const [kind, setKind] = useState("hex");
-  const [h, setH] = useState(6);
-  const [fw, setFw] = useState<number | null>(null);
-  const [fd, setFd] = useState<number | null>(null);
-  const [fillMax, setFillMax] = useState("2x2");
-  const all = bins.filter((b) => b.type === "bin");
-  const systems = [...new Set([...all.map((b) => b.system!), "community"])];
-  const community = system === "community";
-  const [creator, setCreator] = useState(creatorName());
-  const [over, setOver] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
-  const widths = [...new Set(all.map((b) => b.w))].sort((a, b) => a - b);
-  const depths = [...new Set(all.map((b) => b.d))].sort((a, b) => a - b);
-  const list = all
-    .filter((b) => b.system === system && (community || (b.kind === kind && b.h === h)))
-    // a size filter matches either way round (a bin can be turned)
-    .filter((b) => (fw === null || b.w === fw || b.d === fw) && (fd === null || b.d === fd || b.w === fd) && (fw === null || fd === null || (b.w === fw && b.d === fd) || (b.w === fd && b.d === fw)))
-    .sort((a, b) => a.w * a.d - b.w * b.d || a.w - b.w);
-  return (
-    <div className="library">
-      <div className="lib-filters">
-        <div className="seg small">
-          {systems.map((s) => (
-            <button key={s} className={s === system ? "on" : ""} onClick={() => setSystem(s)}>{t(s)}</button>
-          ))}
-        </div>
-        {!community && (
-          <>
-            <div className="seg small">
-              {["hex", "solid"].map((k) => (
-                <button key={k} className={k === kind ? "on" : ""} onClick={() => setKind(k)}>{t(k)}</button>
-              ))}
-            </div>
-            <HeightPicker value={h} onChange={(x) => x !== null && setH(x)} maxU={maxU} />
-          </>
-        )}
-      </div>
-      {community && (
-        <div
-          className={`dropzone ${over ? "over" : ""}`}
-          onDragOver={(e) => (e.preventDefault(), setOver(true))}
-          onDragLeave={() => setOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setOver(false);
-            if (e.dataTransfer.files.length) uploadBins(e.dataTransfer.files);
-          }}
-          onClick={() => fileInput.current?.click()}
-        >
-          <b>{t("Drop STL files here")}</b>
-          <span>{t("or click to choose · also onto the plate")}</span>
-          <input
-            ref={fileInput}
-            type="file"
-            accept=".stl"
-            multiple
-            hidden
-            onChange={(e) => (e.target.files && uploadBins(e.target.files), (e.target.value = ""))}
-          />
-          <input
-            className="creator"
-            placeholder={t("Your name (shown with your bins)")}
-            value={creator}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => {
-              setCreator(e.target.value);
-              try {
-                localStorage.setItem("creator", e.target.value);
-              } catch {
-                /* storage blocked */
-              }
-            }}
-          />
-        </div>
-      )}
-      <div className="size-filter">
-        <span>W</span>
-        <button className={fw === null ? "on" : ""} onClick={() => setFw(null)}>{t("all")}</button>
-        {widths.map((x) => (
-          <button key={x} className={fw === x ? "on" : ""} onClick={() => setFw(fw === x ? null : x)}>{x}</button>
-        ))}
-      </div>
-      <div className="size-filter">
-        <span>D</span>
-        <button className={fd === null ? "on" : ""} onClick={() => setFd(null)}>{t("all")}</button>
-        {depths.map((x) => (
-          <button key={x} className={fd === x ? "on" : ""} onClick={() => setFd(fd === x ? null : x)}>{x}</button>
-        ))}
-      </div>
-      <div className="lib-grid">
-        {list.map((b) => {
-          const s = 30 / Math.max(b.w, b.d, 2);
-          return (
-            <button
-              key={b.file}
-              className={`lib-item ${armed === b.file ? "on" : ""}`}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData("text/bin", b.file);
-                e.dataTransfer.effectAllowed = "copy";
-                onArm(b.file);
-              }}
-              onClick={() => onArm(armed === b.file ? null : b.file)}
-              title={b.name ? `${b.name}${b.creator ? " · " + b.creator : ""} · ${b.w}×${b.d}×${b.h}U${b.warning ? "\n⚠ " + b.warning : ""}` : b.file}
-            >
-              <svg viewBox="-17 -17 34 34" width="34" height="34">
-                <rect x={(-b.w * s) / 2} y={(-b.d * s) / 2} width={b.w * s} height={b.d * s} rx={2} style={{ fill: community ? SYSTEM_COLORS.community[0] : HEIGHT_COLORS[b.h]?.[0] }} />
-              </svg>
-              <span>{b.w}×{b.d}{community ? `×${b.h}` : ""}{b.warning ? " ⚠" : ""}</span>
-              {community && <small className="lib-name">{b.name}</small>}
-              {community && canChange(b.owner_id) && (
-                <span
-                  className="lib-del"
-                  title={t("Delete")}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    if (!confirm(t("Delete “{name}” for everyone?", { name: b.name ?? "" }))) return;
-                    await api.deleteUpload(b.file);
-                    useStore.getState().set({ bins: await api.bins() });
-                  }}
-                >
-                  ✕
-                </span>
-              )}
-            </button>
-          );
-        })}
-        {list.length === 0 && <div className="empty">{t(community ? "No uploaded bins yet" : "No bins for this filter")}</div>}
-      </div>
-      {!community && maxU !== undefined && (
-        <p className={`hint ${h > maxU ? "bad" : ""}`}>
-          {maxU < 1 ? t("No bin fits under the drawer height") : h > maxU ? t("{h}U is too tall for this drawer: up to {max}U fit", { h, max: maxU }) : t("Up to {max}U fit this drawer", { max: maxU })}
-        </p>
-      )}
-      {!community && (
-        <div className="fill-row">
-          <button className="ghost small" disabled={!list.length} onClick={() => onFill(list, fillMax.split("x").map(Number) as [number, number])} title={t("Fills every free spot with the biggest of these bins that fits; one undo takes it back")}>
-            {t("Fill gaps")}
-          </button>
-          <select className="inline-select" value={fillMax} onChange={(e) => setFillMax(e.target.value)}>
-            {["1x1", "2x1", "2x2", "3x2", "3x3", "6x6"].map((a) => (
-              <option key={a} value={a}>{t("up to {size}", { size: a.replace("x", "×") })}</option>
-            ))}
-          </select>
-        </div>
-      )}
-      <p className="hint">{t("Click a size, then click on the plate (or drag it there). R turns (also while dragging), F or a double-click zooms in, Shift-click selects more, ⌘A all, Del removes, arrows move, ⌘Z undoes.")}</p>
-    </div>
-  );
-}
 
 export function LayoutTab() {
   const { schema, bins: library, layout, layoutPreset, theme, selected, also, drawers, active, set, setLayoutPlate, editBins, undo, redo, toast } = useStore();
