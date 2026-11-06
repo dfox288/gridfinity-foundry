@@ -7,6 +7,7 @@ import { grid, PITCH, type Grid } from "../lib/grid";
 import { usePlate } from "../lib/usePlate";
 import { fmtGrams, grams, metres, useVolumes } from "../lib/filament";
 import { meshVolume } from "../lib/stl";
+import { fill } from "../lib/fill";
 import { canChange, DEFAULT_LAYOUT, loadProject, newId, project, toProject, useStore, value, type Layout, type PartLine, type Placed } from "../store";
 import { FURNITURE } from "../lib/furniture";
 import { DrawerTabs } from "./DrawerTabs";
@@ -115,7 +116,7 @@ function SelectionFrame({ x, y, w, d, z, h }: { x: number; y: number; w: number;
   );
 }
 
-function Library({ armed, onArm }: { armed: string | null; onArm: (f: string | null) => void }) {
+function Library({ armed, onArm, onFill }: { armed: string | null; onArm: (f: string | null) => void; onFill: (bins: BinFile[], max: [number, number]) => void }) {
   const bins = useStore((s) => s.bins);
   useStore((s) => s.me);   // re-render on sign-in (canChange)
   const t = useT();
@@ -124,6 +125,7 @@ function Library({ armed, onArm }: { armed: string | null; onArm: (f: string | n
   const [h, setH] = useState(6);
   const [fw, setFw] = useState<number | null>(null);
   const [fd, setFd] = useState<number | null>(null);
+  const [fillMax, setFillMax] = useState("2x2");
   const all = bins.filter((b) => b.type === "bin");
   const systems = [...new Set([...all.map((b) => b.system!), "community"])];
   const community = system === "community";
@@ -248,6 +250,18 @@ function Library({ armed, onArm }: { armed: string | null; onArm: (f: string | n
         })}
         {list.length === 0 && <div className="empty">{t(community ? "No uploaded bins yet" : "No bins for this filter")}</div>}
       </div>
+      {!community && (
+        <div className="fill-row">
+          <button className="ghost small" disabled={!list.length} onClick={() => onFill(list, fillMax.split("x").map(Number) as [number, number])} title={t("Fills every free spot with the biggest of these bins that fits; one undo takes it back")}>
+            {t("Fill gaps")}
+          </button>
+          <select className="inline-select" value={fillMax} onChange={(e) => setFillMax(e.target.value)}>
+            {["1x1", "2x1", "2x2", "3x2", "3x3", "6x6"].map((a) => (
+              <option key={a} value={a}>{t("up to {size}", { size: a.replace("x", "×") })}</option>
+            ))}
+          </select>
+        </div>
+      )}
       <p className="hint">{t("Click a size, then click on the plate (or drag it there). R turns, Del removes, arrows move, ⌘Z undoes.")}</p>
     </div>
   );
@@ -644,7 +658,23 @@ export function LayoutTab() {
         {showOptions && <ParamPanel schema={schema} over={layout.plate} onChange={setLayoutPlate} hide={["plate_size", "bed_size"]} />}
         <div className="card">
           <h3>{t("Bins")}</h3>
-          <Library armed={armed} onArm={(f) => (setArmed(f), set({ selected: null }))} />
+          <Library
+            armed={armed}
+            onArm={(f) => (setArmed(f), set({ selected: null }))}
+            onFill={(cands, max) => {
+              const taken = layout.bins.flatMap((b) => {
+                const i = lib.get(b.file);
+                if (!i) return [];
+                const [w, d] = fp(i, b.rot);
+                return [{ x: b.x, y: b.y, w, d }];
+              });
+              const add = fill(g.cellsX, g.cellsY, taken, cands, max);
+              if (!add.length) return toast(t("No free spot for these bins"));
+              editBins((b) => [...b, ...add.map((a) => ({ id: newId(), ...a }))]);
+              set({ selected: null });
+              toast(t("Added {n} bins (undo takes them back)", { n: add.length }));
+            }}
+          />
         </div>
         <div className="card">
           <h3>{t("Dividers & labels")}</h3>

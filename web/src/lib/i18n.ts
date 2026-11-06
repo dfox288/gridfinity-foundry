@@ -13,6 +13,11 @@ const DE: Record<string, string> = {
   "Loading GridFlock…": "GridFlock wird geladen…",
   // share links
   Share: "Teilen",
+  "Fill gaps": "Lücken füllen",
+  "up to {size}": "bis {size}",
+  "Fills every free spot with the biggest of these bins that fits; one undo takes it back": "Füllt jede freie Stelle mit der größten dieser Boxen, die passt; einmal Rückgängig nimmt alles zurück",
+  "No free spot for these bins": "Kein freier Platz für diese Boxen",
+  "Added {n} bins (undo takes them back)": "{n} Boxen eingesetzt (Rückgängig nimmt sie zurück)",
   "Filament, about": "Filament, etwa",
   "From the solid volume of each part; infill makes the real amount somewhat lower": "Aus dem Volumen jedes Teils; durch die Füllung wird es in Wirklichkeit etwas weniger",
   "Copy a link to this project: baseplate, all drawers and bins": "Link auf dieses Projekt kopieren: Grundplatte, alle Schubladen und Kisten",
