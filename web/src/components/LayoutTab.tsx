@@ -896,7 +896,12 @@ export function LayoutTab() {
                 <span className="bom-name">
                   {info ? `${info.name ? info.name + " · " : ""}${info.w}×${info.d}×${info.h}` : file}
                   <small>{info ? `${t(info.system ?? "")} · ${t(info.kind ?? "")}` : ""}{filament ? ` · ${fn(filament)}` : ""}</small>
-                  {labels.length > 0 && <small className="bom-labels">{labels.join(" · ")}</small>}
+                  {labels.length > 0 && (
+                    <small className="bom-labels" title={labels.join(" · ")}>
+                      {labels.slice(0, 4).join(" · ")}
+                      {labels.length > 4 && ` · ${t("{n} more", { n: labels.length - 4 })}`}
+                    </small>
+                  )}
                 </span>
                 <b>
                   {count}×
