@@ -268,6 +268,8 @@ export function LayoutTab() {
   const [hoverBin, setHoverBin] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);   // the bin's right-click menu, at the pointer
   const [help, setHelp] = useState(false);
+  const [plan, setPlan] = useState(false);   // the flat plan view (orthographic, from above)
+  const [planZoom, setPlanZoom] = useState(1.8);   // its pixels per mm, for labels that fit their bins
   // a right click opens the bin menu, a right drag pans the view: the menu waits for the button to come up (Linux and
   // macOS fire contextmenu on the way down, Windows on the way up) and opens only if the pointer stayed put
   const right = useRef<{ down?: [number, number]; up?: [number, number]; held: boolean; pending?: { x: number; y: number; id: string } }>({ held: false });
@@ -367,6 +369,26 @@ export function LayoutTab() {
     else set({ selected: id, also: now });
   };
 
+  // for poking at it from the browser console and tests, like window.studio
+  (window as unknown as { foundryControls: typeof controls }).foundryControls = controls;
+
+  // Iso, Top and Front leave the plan view (its camera cannot turn)
+  const view = (v: "iso" | "top" | "front") => {
+    if (plan) {
+      pendingView.current = v;
+      return setPlan(false);
+    }
+    fitView(controls.current, frameBox, v);
+  };
+  const pendingView = useRef<"iso" | "top" | "front" | null>(null);
+  // a new camera brings new controls: frame the drawer once they are there
+  useEffect(() => {
+    const t = setTimeout(() => fitView(controls.current, frameBox, plan ? "top" : pendingView.current ?? "iso", false), 60);
+    pendingView.current = null;
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan]);
+
   // the camera onto one bin (double-click, F), keeping the current viewing direction
   const frameBin = (b: Placed) => {
     const info = lib.get(b.file);
@@ -395,7 +417,8 @@ export function LayoutTab() {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === "z") return e.preventDefault(), e.shiftKey ? redo() : undo();
       if (mod && e.key.toLowerCase() === "y") return e.preventDefault(), redo();
-      if (e.key === "1" || e.key === "2" || e.key === "3") return fitView(controls.current, frameBox, (["iso", "top", "front"] as const)[+e.key - 1]);
+      if (e.key === "4") return setPlan((p) => !p);
+      if (e.key === "1" || e.key === "2" || e.key === "3") return view((["iso", "top", "front"] as const)[+e.key - 1]);
       if (e.key === "?") return setHelp((h) => !h);
       if (e.key === "Escape" && (menu || help)) return setMenu(null), setHelp(false);
       if (e.key === "Escape") return setArmed(null), set({ selected: null });
@@ -836,7 +859,7 @@ export function LayoutTab() {
         onPointerLeave={() => setHover(null)}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <Scene theme={theme} controlsRef={controls} onPointerMissed={() => !armed && set({ selected: null })}>
+        <Scene theme={theme} controlsRef={controls} plan={plan} onZoom={setPlanZoom} onPointerMissed={() => !armed && set({ selected: null })}>
           <PointerBridge z={top} onReady={(f) => (toPlane.current = f)} />
           {plate.segments.length > 0 && <PlateMesh segments={plate.segments} layout={pl} colorParts={false} hover={false} baseColor={(layout.plateFilament ?? PLATE_DEFAULT)[1]} />}
           <GridLines g={g} z={top + 0.05} dark={theme === "dark"} />
@@ -925,18 +948,27 @@ export function LayoutTab() {
             layout.bins.map((b) => {
               const info = lib.get(b.file);
               if (!b.label || !info || drag?.id === b.id) return null;
-              const [w] = fp(info, b.rot);
-              // on the front edge of the bin, at its top
+              const [w, d] = fp(info, b.rot);
+              // on the front edge of the bin, at its top; in the plan view in its middle, no wider than the bin
               return (
-                <Html key={`label-${b.id}`} position={[(b.x + w / 2) * PITCH, b.y * PITCH + 7, top - SEAT + 7 * info.h + 5]} center zIndexRange={[10, 0]} distanceFactor={420}>
-                  <div className={`bin-label ${inGroup(b.id) ? "on" : ""}`} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => (e.shiftKey ? toggleSelect(b.id) : set({ selected: b.id }))}>
+                <Html
+                  key={`label-${b.id}`}
+                  position={[(b.x + w / 2) * PITCH, plan ? (b.y + d / 2) * PITCH : b.y * PITCH + 7, top - SEAT + 7 * info.h + 5]}
+                  center
+                  zIndexRange={[10, 0]}
+                  distanceFactor={plan ? undefined : 420}
+                >
+                  <div
+                    className={`bin-label ${inGroup(b.id) ? "on" : ""} ${plan ? "plan" : ""}`}
+                    style={plan ? { width: "max-content", maxWidth: Math.max(24, w * PITCH * planZoom - 8) } : undefined}
+                    onPointerDown={(e) => e.stopPropagation()} onClick={(e) => (e.shiftKey ? toggleSelect(b.id) : set({ selected: b.id }))}>
                     {b.label}
                   </div>
                 </Html>
               );
             })}
         </Scene>
-        <ViewButtons onView={(view) => fitView(controls.current, frameBox, view)} name={layoutPreset} fallback="layout" onHelp={() => setHelp(true)} />
+        <ViewButtons onView={view} name={layoutPreset} fallback="layout" onHelp={() => setHelp(true)} plan={plan} onPlan={() => setPlan(!plan)} />
         {help && <Shortcuts onClose={() => setHelp(false)} />}
         {menu && sel && (
           <div className="ctx-menu card" style={{ left: Math.min(menu.x, innerWidth - 220), top: Math.min(menu.y, innerHeight - 300) }} onContextMenu={(e) => e.preventDefault()}>

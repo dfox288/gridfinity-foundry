@@ -423,3 +423,5 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: 11px; padding: 1px 5p
 .sheet table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .sheet td { padding: 5px 4px; border-top: 1px solid var(--line); vertical-align: top; }
 .sheet td:first-child { width: 42%; }
+.views button.on { background: var(--accent); color: var(--accent-ink); }
+.bin-label.plan { white-space: normal; text-align: center; line-height: 1.15; font-size: 11px; padding: 2px 5px; overflow-wrap: break-word; box-sizing: border-box; }

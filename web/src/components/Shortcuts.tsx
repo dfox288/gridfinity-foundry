@@ -19,6 +19,7 @@ export function Shortcuts({ onClose }: { onClose: () => void }) {
     ["F · " + t("double-click"), t("zoom to the selected bin")],
     [t("Right-click a bin"), t("menu with everything for it")],
     ["1 · 2 · 3", t("view from the side, from above, from the front")],
+    ["4", t("plan view: flat from above, drag the empty plate to pan")],
     [`${M}+Z · ${M}+Shift+Z`, t("undo · redo")],
     ["Esc", t("drop the size in hand, clear the selection")],
     ["?", t("this sheet")],

@@ -13,6 +13,9 @@ const DE: Record<string, string> = {
   "Loading GridFlock…": "GridFlock wird geladen…",
   // share links
   Share: "Teilen",
+  Plan: "Plan",
+  "Plan: flat from above for arranging, drag pans (4)": "Plan: flach von oben zum Anordnen, Ziehen verschiebt (4)",
+  "plan view: flat from above, drag the empty plate to pan": "Planansicht: flach von oben, leere Platte ziehen verschiebt",
   "Label…": "Beschriften…",
   Turn: "Drehen",
   "Copy beside it": "Daneben kopieren",
