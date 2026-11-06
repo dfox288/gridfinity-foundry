@@ -32,6 +32,9 @@ const FLEX_FIT = 0.2;   // flex label press fit (mm, total): holds in every groo
 import { binColor, PLATE_DEFAULT } from "../lib/colors";
 import { GridLines, PointerBridge, SelectionFrame } from "./SceneParts";
 import { Library } from "./Library";
+import { Inventory } from "./Inventory";
+import { pack } from "../lib/pack";
+import type { InvRow } from "../lib/inventory";
 
 const SEAT = 4.4;   // a bin's bottom below the plate top
 
@@ -199,6 +202,43 @@ export function LayoutTab() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan]);
+
+  // inventory rows to bins: packed into the free cells of this drawer (one undo step), the rest handed back
+  const invBins = (rows: InvRow[], taken: { x: number; y: number; w: number; d: number }[]) => {
+    const fit = rows.map((r) => ({ ...r, h: maxU !== undefined && maxU >= 3 ? Math.min(r.h, maxU) : r.h }));
+    const file = (r: InvRow) => `groove/print-bin-groove_hex-${r.w}x${r.d}x${r.h}.stl`;
+    const known = fit.filter((r) => lib.has(file(r)));
+    const res = pack(g.cellsX, g.cellsY, taken, known);
+    const placed = res.placed.map((p) => ({ id: newId(), file: file(known[p.index]), x: p.x, y: p.y, rot: p.rot, label: known[p.index].item || undefined }));
+    return { placed, left: [...res.left.map((i) => known[i]), ...fit.filter((r) => !lib.has(file(r)))] };
+  };
+  const placeInventory = (rows: InvRow[]) => {
+    const taken = layout.bins.flatMap((b) => {
+      const i = lib.get(b.file);
+      if (!i) return [];
+      const [w, d] = fp(i, b.rot);
+      return [{ x: b.x, y: b.y, w, d }];
+    });
+    const { placed, left } = invBins(rows, taken);
+    if (placed.length) editBins((bs) => [...bs, ...placed]);
+    toast(t("{n} bins placed", { n: placed.length }));
+    return left;
+  };
+  const inventoryDrawer = (rows: InvRow[]) => {
+    const { placed, left } = invBins(rows, []);
+    if (!placed.length) return left;
+    const pr = project();
+    const cur = pr.drawers[pr.active];
+    pr.drawers.push({
+      id: newId(),
+      name: `${t("Drawer")} ${pr.drawers.length + 1}`,
+      furniture: cur.furniture,
+      layout: { ...DEFAULT_LAYOUT, plate: { ...cur.layout.plate }, plateFilament: cur.layout.plateFilament, height: cur.layout.height, bins: placed },
+    });
+    loadProject({ ...pr, active: pr.drawers.length - 1 });
+    toast(t("{n} bins placed", { n: placed.length }));
+    return left;
+  };
 
   // the camera onto one bin (double-click, F), keeping the current viewing direction
   const frameBin = (b: Placed) => {
@@ -665,6 +705,10 @@ export function LayoutTab() {
               toast(t("Added {n} bins (undo takes them back)", { n: add.length }));
             }}
           />
+        </div>
+        <div className="card">
+          <h3>{t("From your inventory")}</h3>
+          <Inventory onPlace={placeInventory} onNewDrawer={inventoryDrawer} />
         </div>
         <div className="card">
           <h3>{t("Dividers & labels")}</h3>

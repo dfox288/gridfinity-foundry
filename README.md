@@ -22,6 +22,10 @@ onto it, and download everything as STL files or as a Bambu Studio project with 
   from.
 - **Drawer height**: give the drawer's inner height and bins that would stick out are framed in red (heights measured
   from the bins' meshes, standing in the baseplate).
+- **From your inventory**: paste what you want to store (one thing per line) or upload a CSV (a template to download);
+  each line gets a suggested bin (size and height guessed from the words, the count and a length in cm, English and
+  German), you check the guesses, and the bins are placed and labelled in the drawer; what does not fit goes into a
+  new drawer.
 - **Your own bins**: drop any Gridfinity STL onto the plate (or into the Community section). It is centred, measured
   against the grid and added to the library on the server with your name, for everyone using that installation.
 - **Engraved labels**: every labelled flex bin gets its flex label with the text engraved (sized to fit), in the print
