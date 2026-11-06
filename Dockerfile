@@ -5,7 +5,7 @@ RUN corepack enable
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY web/ ./
-RUN pnpm build
+RUN pnpm build && pnpm test
 
 FROM --platform=$BUILDPLATFORM debian:trixie-slim AS gridflock
 ARG GRIDFLOCK_REF=033e8f9dab860ce7ef46ca3f1dd656a1d13c5310

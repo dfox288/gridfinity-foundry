@@ -26,6 +26,7 @@ import { fitView, Scene, type Controls } from "./Scene";
 import { HeightPicker } from "./HeightPicker";
 import { ViewButtons } from "./ViewButtons";
 import { FindBin } from "./FindBin";
+import { type Cand, copySpot, fits, fp, snap, whole } from "../lib/placement";
 
 const FLEX_FIT = 0.2;   // flex label press fit (mm, total): holds in every groove bin width
 
@@ -39,36 +40,6 @@ const HEIGHT_COLORS: Record<number, [string, string]> = {
 const SYSTEM_COLORS: Record<string, [string, string]> = { groove: ["#0056B8", "Cobalt Blue"], click: ["#FF6A13", "Orange"], community: ["#00AE42", "Bambu Green"] };
 const PLATE_DEFAULT: [string, string] = ["PLA Basic · Gray", "#8E9089"];
 const SEAT = 4.4;   // a bin's bottom below the plate top
-
-type Cand = { file: string; x: number; y: number; rot: 0 | 1 };
-
-const fp = (b: BinFile, rot: 0 | 1) => (rot ? [b.d, b.w] : [b.w, b.d]);
-const whole = (b: BinFile) => Number.isInteger(b.w) && Number.isInteger(b.d);
-
-function fits(c: Cand, info: BinFile, g: Grid, bins: Placed[], lib: Map<string, BinFile>, ignore?: string) {
-  const [w, d] = fp(info, c.rot);
-  const e = 1e-6;
-  if (c.x < -e || c.y < -e || c.x + w > g.cellsX + e || c.y + d > g.cellsY + e) return false;
-  if (whole(info) && (!Number.isInteger(c.x) || !Number.isInteger(c.y))) return false;   // full-pitch feet sit on whole cells
-  for (const o of bins) {
-    if (o.id === ignore) continue;
-    const oi = lib.get(o.file);
-    if (!oi) continue;
-    const [ow, od] = fp(oi, o.rot);
-    if (c.x < o.x + ow - e && o.x < c.x + w - e && c.y < o.y + od - e && o.y < c.y + d - e) return false;
-  }
-  return true;
-}
-
-function snap(px: number, py: number, info: BinFile, rot: 0 | 1, g: Grid): [number, number] {
-  const [w, d] = fp(info, rot);
-  const step = whole(info) ? 1 : 2;
-  const clamp = (v: number, max: number) => Math.min(Math.max(v, 0), Math.max(0, max));
-  return [
-    clamp(Math.round((px / PITCH - w / 2) * step) / step, Math.floor((g.cellsX - w) * step) / step),
-    clamp(Math.round((py / PITCH - d / 2) * step) / step, Math.floor((g.cellsY - d) * step) / step),
-  ];
-}
 
 // a bin's colour and the filament it stands for
 function binColor(b: Placed, info: BinFile | undefined, mode: Layout["colorMode"]): [string, string] {
@@ -369,12 +340,8 @@ export function LayoutTab() {
   const copy = () => {
     const sel = selNow();
     if (!sel) return;
-    // right beside the original (right, behind, left, in front), else the next free spot from the front left
-    const [w, d] = fp(lib.get(sel.file)!, sel.rot);
-    for (const [dx, dy] of [[w, 0], [0, d], [-w, 0], [0, -d]]) if (place({ file: sel.file, x: sel.x + dx, y: sel.y + dy, rot: sel.rot })) return;
-    const st = whole(lib.get(sel.file)!) ? 1 : 0.5;
-    for (let y = 0; y <= g.cellsY; y += st)
-      for (let x = 0; x <= g.cellsX; x += st) if (place({ file: sel.file, x, y, rot: sel.rot })) return;
+    const spot = copySpot(sel, lib.get(sel.file)!, g, layout.bins, lib);
+    if (spot && place(spot)) return;
     toast(t("No free spot for a copy"));
   };
 
