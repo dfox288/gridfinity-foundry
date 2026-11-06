@@ -241,13 +241,18 @@ function Library({ armed, onArm, onFill, maxU }: { armed: string | null; onArm: 
           </select>
         </div>
       )}
-      <p className="hint">{t("Click a size, then click on the plate (or drag it there). R turns (also while dragging), F or a double-click zooms in, Del removes, arrows move, ⌘Z undoes.")}</p>
+      <p className="hint">{t("Click a size, then click on the plate (or drag it there). R turns (also while dragging), F or a double-click zooms in, Shift-click selects more, ⌘A all, Del removes, arrows move, ⌘Z undoes.")}</p>
     </div>
   );
 }
 
 export function LayoutTab() {
-  const { schema, bins: library, layout, layoutPreset, theme, selected, drawers, active, set, setLayoutPlate, editBins, undo, redo, toast } = useStore();
+  const { schema, bins: library, layout, layoutPreset, theme, selected, also, drawers, active, set, setLayoutPlate, editBins, undo, redo, toast } = useStore();
+  // every selected bin: the one in the card plus those added with Shift-click or ⌘A
+  const group = selected ? [selected, ...also.filter((id) => id !== selected && layout.bins.some((b) => b.id === id))] : [];
+  const multi = group.length > 1;
+  const inGroup = (id: string) => group.includes(id);
+  const removeGroup = () => (editBins((b) => b.filter((x) => !inGroup(x.id))), set({ selected: null }));
   const lib = useMemo(() => new Map(library.map((b) => [b.file, b])), [library]);
   const t = useT();
   const lang = useStore((s) => s.lang);
@@ -321,6 +326,7 @@ export function LayoutTab() {
   const selNow = () => layout.bins.find((b) => b.id === selected);
   const turn = () => {
     if (armed) return setArmedRot(armedRot ? 0 : 1);
+    if (multi && !drag) return toast(t("Turn one bin at a time"));
     if (drag) {
       // turn the bin in hand about its footprint's centre, kept on the grid
       const b = layout.bins.find((x) => x.id === drag.id);
@@ -343,6 +349,16 @@ export function LayoutTab() {
     const spot = copySpot(sel, lib.get(sel.file)!, g, layout.bins, lib);
     if (spot && place(spot)) return;
     toast(t("No free spot for a copy"));
+  };
+
+  // Shift-click (on a bin or its label) adds the bin to the selection or takes it out; read from the store, as the
+  // click may come before this component has re-rendered with the last one
+  const toggleSelect = (id: string) => {
+    const st = useStore.getState();
+    const now = st.selected ? [st.selected, ...st.also.filter((x) => x !== st.selected)] : [];
+    const rest = now.filter((x) => x !== id);
+    if (now.includes(id)) set({ selected: rest[rest.length - 1] ?? null, also: rest.slice(0, -1) });
+    else set({ selected: id, also: now });
   };
 
   // the camera onto one bin (double-click, F), keeping the current viewing direction
@@ -375,14 +391,33 @@ export function LayoutTab() {
       if (mod && e.key.toLowerCase() === "y") return e.preventDefault(), redo();
       if (e.key === "1" || e.key === "2" || e.key === "3") return fitView(controls.current, frameBox, (["iso", "top", "front"] as const)[+e.key - 1]);
       if (e.key === "Escape") return setArmed(null), set({ selected: null });
+      if (mod && e.key.toLowerCase() === "a" && layout.bins.length) {
+        e.preventDefault();
+        const ids = layout.bins.map((b) => b.id);
+        return set({ selected: ids[ids.length - 1], also: ids.slice(0, -1) });
+      }
       const sel = layout.bins.find((b) => b.id === selected);
       if (e.key === "r" || e.key === "R") return turn();
       if (!sel) return;
       if ((e.key === "f" || e.key === "F") && !mod) return frameBin(sel);
-      if (e.key === "Delete" || e.key === "Backspace") return e.preventDefault(), editBins((b) => b.filter((x) => x.id !== sel.id)), set({ selected: null });
+      if (e.key === "Delete" || e.key === "Backspace") return e.preventDefault(), removeGroup();
       const info = lib.get(sel.file)!;
       const step = whole(info) ? 1 : 0.5;
       const mv: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] };
+      if (mv[e.key] && multi) {
+        // the group moves together, half a cell if any of them is a half bin, or not at all
+        e.preventDefault();
+        const half = group.some((id) => {
+          const b = layout.bins.find((x) => x.id === id);
+          return b && !whole(lib.get(b.file)!);
+        });
+        const unit = half ? 0.5 : 1;
+        const [dx, dy] = [Math.sign(mv[e.key][0]) * unit, Math.sign(mv[e.key][1]) * unit];
+        const others = layout.bins.filter((b) => !inGroup(b.id));
+        const moved = layout.bins.filter((b) => inGroup(b.id)).map((b) => ({ ...b, x: b.x + dx, y: b.y + dy }));
+        if (moved.every((m) => fits(m, lib.get(m.file)!, g, others, lib))) editBins((bs) => bs.map((b) => moved.find((m) => m.id === b.id) ?? b));
+        return;
+      }
       if (mv[e.key]) {
         e.preventDefault();
         const c = { ...sel, x: sel.x + mv[e.key][0], y: sel.y + mv[e.key][1] };
@@ -800,7 +835,7 @@ export function LayoutTab() {
                 at={centre(b, info)}
                 rot={b.rot}
                 color={binColor(b, info, layout.colorMode)[0]}
-                selected={b.id === selected}
+                selected={inGroup(b.id)}
                 hovered={b.id === hoverBin && !drag && !armed}
                 onClick={(e) => e.stopPropagation()}   // not a click on the empty plate
                 onDoubleClick={(e) => (e.stopPropagation(), frameBin(b))}
@@ -809,6 +844,7 @@ export function LayoutTab() {
                 onPointerDown={(e) => {
                   if (armed || e.button !== 0) return;
                   e.stopPropagation();
+                  if (e.shiftKey) return toggleSelect(b.id);
                   set({ selected: b.id });
                   const c = centre(b, info);
                   setDrag({ id: b.id, dx: e.point.x - c.x, dy: e.point.y - c.y, x: b.x, y: b.y, rot: b.rot });
@@ -832,6 +868,14 @@ export function LayoutTab() {
             const [w, d] = fp(i, b.rot);
             return <SelectionFrame key={`tall-${b.id}`} x={b.x} y={b.y} w={w} d={d} z={top - SEAT} h={heights.get(b.file) ?? 7 * i.h + 4} color="#ef4444" />;
           })}
+          {multi &&
+            group.slice(1).map((id) => {
+              const b = layout.bins.find((x) => x.id === id);
+              const i = b && lib.get(b.file);
+              if (!b || !i) return null;
+              const [w, d] = fp(i, b.rot);
+              return <SelectionFrame key={`also-${id}`} x={b.x} y={b.y} w={w} d={d} z={top - SEAT} h={7 * i.h + 4} />;
+            })}
           {sel && selInfo && !drag && (() => {
             const [w, d] = fp(selInfo, sel.rot);
             return <SelectionFrame x={sel.x} y={sel.y} w={w} d={d} z={top - SEAT} h={7 * selInfo.h + 4} />;
@@ -844,7 +888,7 @@ export function LayoutTab() {
               // on the front edge of the bin, at its top
               return (
                 <Html key={`label-${b.id}`} position={[(b.x + w / 2) * PITCH, b.y * PITCH + 7, top - SEAT + 7 * info.h + 5]} center zIndexRange={[10, 0]} distanceFactor={420}>
-                  <div className={`bin-label ${b.id === selected ? "on" : ""}`} onPointerDown={(e) => e.stopPropagation()} onClick={() => set({ selected: b.id })}>
+                  <div className={`bin-label ${inGroup(b.id) ? "on" : ""}`} onPointerDown={(e) => e.stopPropagation()} onClick={(e) => (e.shiftKey ? toggleSelect(b.id) : set({ selected: b.id }))}>
                     {b.label}
                   </div>
                 </Html>
@@ -879,7 +923,12 @@ export function LayoutTab() {
           {/* the selected bin's card; greyed out while nothing is selected (2026-11-03) */}
           <div className={`card selected ${sel && selInfo ? "" : "idle"}`}>
             <div className="sel-head">
-              {sel && selInfo ? (
+              {multi ? (
+                <>
+                  <b>{t("{n} bins", { n: group.length })}</b>
+                  <span>{t("selected")}</span>
+                </>
+              ) : sel && selInfo ? (
                 <>
                   <b>{selInfo.w}×{selInfo.d}×{selInfo.h}</b>
                   <span>{t(selInfo.system ?? "")} · {t(selInfo.kind ?? "")}</span>
@@ -889,11 +938,11 @@ export function LayoutTab() {
               )}
             </div>
             <input
-              key={sel?.id ?? "none"}
+              key={multi ? "multi" : sel?.id ?? "none"}
               className="label-input"
-              disabled={!sel}
-              placeholder={t("Label, e.g. M3 screws")}
-              defaultValue={sel?.label ?? ""}
+              disabled={!sel || multi}
+              placeholder={multi ? t("Labels one bin at a time") : t("Label, e.g. M3 screws")}
+              defaultValue={multi ? "" : sel?.label ?? ""}
               maxLength={40}
               onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
               onBlur={(e) => {
@@ -919,18 +968,18 @@ export function LayoutTab() {
                   className={sel && sel.color === hex && sel.filament === `${material} · ${name}` && layout.colorMode === "custom" ? "on" : ""}
                   onClick={() => {
                     if (!sel) return;
-                    editBins((b) => b.map((x) => (x.id === sel.id ? { ...x, color: hex, filament: `${material} · ${name}` } : x)));
+                    editBins((b) => b.map((x) => (inGroup(x.id) ? { ...x, color: hex, filament: `${material} · ${name}` } : x)));
                     if (layout.colorMode !== "custom") set({ layout: { ...useStore.getState().layout, colorMode: "custom" } });
                   }}
                 />
               ))}
             </div>
             <div className="row-btns">
-              <button className="ghost small" disabled={!sel} onClick={turn}>{t("Turn (R)")}</button>
-              <button className="ghost small" disabled={!sel} onClick={copy}>{t("Copy (⌘D)")}</button>
-              <button className="ghost small" disabled={!sel} onClick={addDividers}>{t("+ Dividers")}</button>
-              <button className="ghost small" disabled={!sel} onClick={addLabel}>{t("+ Label")}</button>
-              <button className="ghost small danger" disabled={!sel} onClick={() => sel && (editBins((b) => b.filter((x) => x.id !== sel.id)), set({ selected: null }))}>{t("Remove")}</button>
+              <button className="ghost small" disabled={!sel || multi} onClick={turn}>{t("Turn (R)")}</button>
+              <button className="ghost small" disabled={!sel || multi} onClick={copy}>{t("Copy (⌘D)")}</button>
+              <button className="ghost small" disabled={!sel || multi} onClick={addDividers}>{t("+ Dividers")}</button>
+              <button className="ghost small" disabled={!sel || multi} onClick={addLabel}>{t("+ Label")}</button>
+              <button className="ghost small danger" disabled={!sel} onClick={removeGroup}>{multi ? t("Remove {n}", { n: group.length }) : t("Remove")}</button>
             </div>
           </div>
           <div className="card bom">

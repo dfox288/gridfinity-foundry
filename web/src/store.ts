@@ -71,6 +71,7 @@ interface State {
   past: Placed[][];
   future: Placed[][];
   selected: string | null;
+  also: string[];      // more selected bins (Shift-click, ⌘A) besides `selected`; any new `selected` alone clears them
   toasts: Toast[];
   set: (s: Partial<State>) => void;
   setPlateParam: (name: string, v: ParamValue | undefined) => void;
@@ -141,8 +142,9 @@ export const useStore = create<State>((set, get) => ({
   past: [],
   future: [],
   selected: null,
+  also: [],
   toasts: [],
-  set: (s) => set(s),
+  set: (s) => set("selected" in s && !("also" in s) ? { ...s, also: [] } : s),
   setPlateParam: (name, v) => set({ plate: override(get().plate, get().schema, name, v) }),
   setLayoutPlate: (name, v) => set({ layout: { ...get().layout, plate: override(get().layout.plate, get().schema, name, v) } }),
   editBins: (f) => {

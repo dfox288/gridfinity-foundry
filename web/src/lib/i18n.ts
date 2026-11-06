@@ -13,6 +13,11 @@ const DE: Record<string, string> = {
   "Loading GridFlock…": "GridFlock wird geladen…",
   // share links
   Share: "Teilen",
+  "{n} bins": "{n} Boxen",
+  selected: "ausgewählt",
+  "Labels one bin at a time": "Beschriftung je Box einzeln",
+  "Remove {n}": "{n} löschen",
+  "Turn one bin at a time": "Boxen einzeln drehen",
   "No bin fits under the drawer height": "Unter die Schubladenhöhe passt keine Box",
   "{h}U is too tall for this drawer: up to {max}U fit": "{h}U ist zu hoch für diese Schublade: bis {max}U passen",
   "Up to {max}U fit this drawer": "Bis {max}U passen in diese Schublade",
@@ -101,8 +106,8 @@ const DE: Record<string, string> = {
   "Baseplate tab settings applied (drawer size kept)": "Einstellungen vom Grundplatten-Tab übernommen (Schubladengröße bleibt)",
   Bins: "Boxen",
   "No bins for this filter": "Keine Boxen für diesen Filter",
-  "Click a size, then click on the plate (or drag it there). R turns (also while dragging), F or a double-click zooms in, Del removes, arrows move, ⌘Z undoes.":
-    "Größe anklicken, dann auf die Platte klicken (oder hinziehen). R dreht (auch beim Ziehen), F oder Doppelklick zoomt hin, Entf löscht, Pfeiltasten verschieben, ⌘Z macht rückgängig.",
+  "Click a size, then click on the plate (or drag it there). R turns (also while dragging), F or a double-click zooms in, Shift-click selects more, ⌘A all, Del removes, arrows move, ⌘Z undoes.":
+    "Größe anklicken, dann auf die Platte klicken (oder hinziehen). R dreht (auch beim Ziehen), F oder Doppelklick zoomt hin, Shift-Klick wählt mehr, ⌘A alle, Entf löscht, Pfeiltasten verschieben, ⌘Z macht rückgängig.",
   "Pick a bin size on the left, then click on the plate": "Links eine Boxgröße wählen, dann auf die Platte klicken",
   "No room there": "Dort ist kein Platz",
   "No room to turn it here": "Hier ist kein Platz zum Drehen",
