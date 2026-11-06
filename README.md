@@ -99,6 +99,10 @@ get the per-plate download, without settings.
   described at the top of `server/app.py`.
 - `web/`: Vite, React, three.js (react-three-fiber, drei), zustand. `pnpm install && pnpm dev` against a server on :8742.
 - The Docker build fetches GridFlock, Gridfinity Extended and Bambu Studio's printer profiles at pinned versions.
+- Tests: `pnpm test` runs the unit tests (vitest, `src/**/*.test.ts`: placement, fill, grid, filament); the Docker
+  build runs them too. `pnpm e2e` runs the browser checks in `e2e/` (Playwright) against a running app
+  (`docker compose up -d --build`; `E2E_URL` for another address; `npx playwright install chromium` once).
+- In the browser console, `studio` is the store and `foundryControls` the camera controls.
 
 ## Credits and licence
 

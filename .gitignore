@@ -5,3 +5,5 @@ web/tsconfig.tsbuildinfo
 uploads/*
 !uploads/.keep
 __pycache__/
+web/test-results/
+web/playwright-report/
