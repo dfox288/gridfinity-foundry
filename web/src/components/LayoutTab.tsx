@@ -26,6 +26,7 @@ import { fitView, Scene, type Controls } from "./Scene";
 import { HeightPicker } from "./HeightPicker";
 import { ViewButtons } from "./ViewButtons";
 import { FindBin } from "./FindBin";
+import { MOD, Shortcuts } from "./Shortcuts";
 import { type Cand, copySpot, fits, fp, snap, whole } from "../lib/placement";
 
 const FLEX_FIT = 0.2;   // flex label press fit (mm, total): holds in every groove bin width
@@ -265,6 +266,11 @@ export function LayoutTab() {
   const [hover, setHover] = useState<[number, number] | null>(null);
   const [drag, setDrag] = useState<{ id: string; dx: number; dy: number; x: number; y: number; rot: 0 | 1 } | null>(null);
   const [hoverBin, setHoverBin] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);   // the bin's right-click menu, at the pointer
+  const [help, setHelp] = useState(false);
+  // a right click opens the bin menu, a right drag pans the view: the menu waits for the button to come up (Linux and
+  // macOS fire contextmenu on the way down, Windows on the way up) and opens only if the pointer stayed put
+  const right = useRef<{ down?: [number, number]; up?: [number, number]; held: boolean; pending?: { x: number; y: number; id: string } }>({ held: false });
   const [showOptions, setShowOptions] = useState(false);
   const [busy, setBusy] = useState(false);
   const controls = useRef<Controls>(null);
@@ -390,6 +396,8 @@ export function LayoutTab() {
       if (mod && e.key.toLowerCase() === "z") return e.preventDefault(), e.shiftKey ? redo() : undo();
       if (mod && e.key.toLowerCase() === "y") return e.preventDefault(), redo();
       if (e.key === "1" || e.key === "2" || e.key === "3") return fitView(controls.current, frameBox, (["iso", "top", "front"] as const)[+e.key - 1]);
+      if (e.key === "?") return setHelp((h) => !h);
+      if (e.key === "Escape" && (menu || help)) return setMenu(null), setHelp(false);
       if (e.key === "Escape") return setArmed(null), set({ selected: null });
       if (mod && e.key.toLowerCase() === "a" && layout.bins.length) {
         e.preventDefault();
@@ -428,6 +436,29 @@ export function LayoutTab() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  useEffect(() => {
+    const r = right.current;
+    const down = (e: PointerEvent) => {
+      if (e.button === 2) Object.assign(r, { down: [e.clientX, e.clientY], held: true, pending: undefined });
+      if (!(e.target instanceof Element && e.target.closest(".ctx-menu"))) setMenu(null);
+    };
+    const up = (e: PointerEvent) => {
+      if (e.button !== 2) return;
+      Object.assign(r, { up: [e.clientX, e.clientY], held: false });
+      if (r.pending && r.down && Math.hypot(e.clientX - r.down[0], e.clientY - r.down[1]) <= 5) openMenu(r.pending);
+      r.pending = undefined;
+    };
+    window.addEventListener("pointerdown", down, true);
+    window.addEventListener("pointerup", up, true);
+    return () => (window.removeEventListener("pointerdown", down, true), window.removeEventListener("pointerup", up, true));
+  }, []);
+
+  function openMenu(at: { x: number; y: number; id: string }) {
+    const st = useStore.getState();
+    if (st.selected !== at.id && !st.also.includes(at.id)) set({ selected: at.id });
+    setMenu({ x: at.x, y: at.y });
+  }
 
   // finish a drag anywhere
   useEffect(() => {
@@ -803,6 +834,7 @@ export function LayoutTab() {
           setArmed(null);
         }}
         onPointerLeave={() => setHover(null)}
+        onContextMenu={(e) => e.preventDefault()}
       >
         <Scene theme={theme} controlsRef={controls} onPointerMissed={() => !armed && set({ selected: null })}>
           <PointerBridge z={top} onReady={(f) => (toPlane.current = f)} />
@@ -839,6 +871,15 @@ export function LayoutTab() {
                 hovered={b.id === hoverBin && !drag && !armed}
                 onClick={(e) => e.stopPropagation()}   // not a click on the empty plate
                 onDoubleClick={(e) => (e.stopPropagation(), frameBin(b))}
+                onContextMenu={(e) => {
+                  e.stopPropagation();
+                  e.nativeEvent.preventDefault();
+                  if (armed) return;
+                  const r = right.current;
+                  const at = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY, id: b.id };
+                  if (r.held) r.pending = at;   // decided when the button comes up
+                  else if (!r.down || !r.up || Math.hypot(r.up[0] - r.down[0], r.up[1] - r.down[1]) <= 5) openMenu(at);
+                }}
                 onPointerOver={(e) => (e.stopPropagation(), setHoverBin(b.id))}
                 onPointerOut={() => setHoverBin((h) => (h === b.id ? null : h))}
                 onPointerDown={(e) => {
@@ -895,7 +936,29 @@ export function LayoutTab() {
               );
             })}
         </Scene>
-        <ViewButtons onView={(view) => fitView(controls.current, frameBox, view)} name={layoutPreset} fallback="layout" />
+        <ViewButtons onView={(view) => fitView(controls.current, frameBox, view)} name={layoutPreset} fallback="layout" onHelp={() => setHelp(true)} />
+        {help && <Shortcuts onClose={() => setHelp(false)} />}
+        {menu && sel && (
+          <div className="ctx-menu card" style={{ left: Math.min(menu.x, innerWidth - 220), top: Math.min(menu.y, innerHeight - 300) }} onContextMenu={(e) => e.preventDefault()}>
+            <div className="ctx-title">{multi ? t("{n} bins", { n: group.length }) : `${selInfo?.w}×${selInfo?.d}×${selInfo?.h}${sel.label ? ` · ${sel.label}` : ""}`}</div>
+            {(
+              [
+                [t("Label…"), "", () => document.querySelector<HTMLInputElement>(".label-input")?.focus(), multi],
+                [t("Turn"), "R", turn, multi],
+                [t("Copy beside it"), `${MOD}D`, copy, multi],
+                [t("Zoom to it"), "F", () => frameBin(sel), false],
+                [t("+ Dividers"), "", addDividers, multi],
+                [t("+ Label"), "", addLabel, multi],
+                [multi ? t("Remove {n}", { n: group.length }) : t("Remove"), "Del", removeGroup, false],
+              ] as [string, string, () => void, boolean][]
+            ).map(([label, key, run, off]) => (
+              <button key={label} disabled={off} className={label.startsWith(t("Remove")) ? "danger" : ""} onClick={() => (setMenu(null), run())}>
+                <span>{label}</span>
+                {key && <kbd>{key}</kbd>}
+              </button>
+            ))}
+          </div>
+        )}
         <DrawerTabs />
         {plate.loading && <div className="spinner" title={t("Rendering the plate…")} />}
         {plate.error && <div className="stage-error">{plate.error}</div>}

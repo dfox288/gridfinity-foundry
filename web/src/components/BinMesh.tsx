@@ -33,7 +33,7 @@ export function useBinGeometry(file: string | null) {
 }
 
 // A bin standing on the plate. `at` is its centre on the plate top; it drops in when it first appears.
-export function BinMesh({ file, at, rot, color, selected, hovered, ghost, valid = true, onPointerDown, onClick, onDoubleClick, onPointerOver, onPointerOut }: {
+export function BinMesh({ file, at, rot, color, selected, hovered, ghost, valid = true, onPointerDown, onClick, onDoubleClick, onPointerOver, onPointerOut, onContextMenu }: {
   file: string;
   at: THREE.Vector3;
   rot: 0 | 1;
@@ -47,6 +47,7 @@ export function BinMesh({ file, at, rot, color, selected, hovered, ghost, valid 
   onDoubleClick?: (e: ThreeEvent<MouseEvent>) => void;
   onPointerOver?: (e: ThreeEvent<PointerEvent>) => void;
   onPointerOut?: (e: ThreeEvent<PointerEvent>) => void;
+  onContextMenu?: (e: ThreeEvent<MouseEvent>) => void;
 }) {
   const geo = useBinGeometry(file);
   const ref = useRef<THREE.Group>(null);
@@ -58,7 +59,7 @@ export function BinMesh({ file, at, rot, color, selected, hovered, ghost, valid 
   });
   const c = ghost ? (valid ? "#4ade80" : "#f87171") : color;
   return (
-    <group ref={ref} rotation={[0, 0, rot ? Math.PI / 2 : 0]} onPointerDown={onPointerDown} onClick={onClick} onDoubleClick={onDoubleClick} onPointerOver={onPointerOver} onPointerOut={onPointerOut}>
+    <group ref={ref} rotation={[0, 0, rot ? Math.PI / 2 : 0]} onPointerDown={onPointerDown} onClick={onClick} onDoubleClick={onDoubleClick} onPointerOver={onPointerOver} onPointerOut={onPointerOut} onContextMenu={onContextMenu}>
       {geo ? (
         <mesh geometry={geo} castShadow={!ghost} receiveShadow={!ghost}>
           <meshStandardMaterial
