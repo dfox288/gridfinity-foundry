@@ -8,6 +8,7 @@ import { usePlate } from "../lib/usePlate";
 import { fmtGrams, grams, metres, useVolumes } from "../lib/filament";
 import { meshVolume } from "../lib/stl";
 import { fill } from "../lib/fill";
+import { drawerMapHtml } from "../lib/drawerMap";
 import { canChange, DEFAULT_LAYOUT, loadProject, newId, project, toProject, useStore, value, type Layout, type PartLine, type Placed } from "../store";
 import { FURNITURE } from "../lib/furniture";
 import { DrawerTabs } from "./DrawerTabs";
@@ -990,6 +991,34 @@ export function LayoutTab() {
               }}
             >
               {t("STL files (.zip)")}
+            </button>
+            <button
+              className="ghost"
+              disabled={!inScope.some((d) => d.layout.bins.length)}
+              title={t("A top view of each drawer with every bin's label, to print and stick inside the cabinet")}
+              onClick={() => {
+                const maps = inScope.map((d) => {
+                  const dg = grid((n) => value(d.layout.plate, schema, n));
+                  return {
+                    name: d.name,
+                    cellsX: dg.cellsX,
+                    cellsY: dg.cellsY,
+                    sizeMm: dg.size,
+                    bins: d.layout.bins.flatMap((b) => {
+                      const info = lib.get(b.file);
+                      if (!info) return [];
+                      const [w, dd] = fp(info, b.rot);
+                      return [{ x: b.x, y: b.y, w, d: dd, color: binColor(b, info, d.layout.colorMode)[0], text: b.label ?? "", size: `${info.w}×${info.d}×${info.h}` }];
+                    }),
+                  };
+                });
+                const html = drawerMapHtml(layoutPreset ?? t("Drawer map"), maps, { front: t("front"), bins: t("bins"), empty: t("No bins yet") });
+                const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+                if (!window.open(url, "_blank")) download(new Blob([html], { type: "text/html" }), fileName(layoutPreset, "layout", "html", "map"));
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+              }}
+            >
+              {t("Drawer map to print")}
             </button>
           </div>
         </div>

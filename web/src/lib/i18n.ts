@@ -13,6 +13,11 @@ const DE: Record<string, string> = {
   "Loading GridFlock…": "GridFlock wird geladen…",
   // share links
   Share: "Teilen",
+  "Drawer map to print": "Schubladenplan zum Ausdrucken",
+  "A top view of each drawer with every bin's label, to print and stick inside the cabinet": "Draufsicht jeder Schublade mit den Beschriftungen der Boxen, zum Ausdrucken und Aufkleben in den Schrank",
+  "Drawer map": "Schubladenplan",
+  front: "vorne",
+  bins: "Boxen",
   "Fill gaps": "Lücken füllen",
   "up to {size}": "bis {size}",
   "Fills every free spot with the biggest of these bins that fits; one undo takes it back": "Füllt jede freie Stelle mit der größten dieser Boxen, die passt; einmal Rückgängig nimmt alles zurück",

@@ -26,6 +26,8 @@ onto it, and download everything as STL files or as a Bambu Studio project with 
   bin, or from the parts list).
 - **Filament estimate**: grams per line of the print list and the total in grams and metres, from the solid volume of
   each part (infill makes the real amount somewhat lower).
+- **Drawer map**: a printable top view of each drawer (A4, one page each) with every bin's label, to stick inside the
+  cabinet.
 - **Downloads**: a print list with counts and filaments; a zip of all STL files; a Bambu Studio project (.3mf) with every
   part packed onto build plates of your printer's size, one plate per colour, or one file per plate.
 - **Printers**: every Bambu Lab printer and nozzle from Bambu Studio's profiles sets the bed size. A Bambu project needs
