@@ -33,16 +33,20 @@ export function useBinGeometry(file: string | null) {
 }
 
 // A bin standing on the plate. `at` is its centre on the plate top; it drops in when it first appears.
-export function BinMesh({ file, at, rot, color, selected, ghost, valid = true, onPointerDown, onClick }: {
+export function BinMesh({ file, at, rot, color, selected, hovered, ghost, valid = true, onPointerDown, onClick, onDoubleClick, onPointerOver, onPointerOut }: {
   file: string;
   at: THREE.Vector3;
   rot: 0 | 1;
   color: string;
   selected?: boolean;
+  hovered?: boolean;
   ghost?: boolean;
   valid?: boolean;
   onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
   onClick?: (e: ThreeEvent<MouseEvent>) => void;
+  onDoubleClick?: (e: ThreeEvent<MouseEvent>) => void;
+  onPointerOver?: (e: ThreeEvent<PointerEvent>) => void;
+  onPointerOut?: (e: ThreeEvent<PointerEvent>) => void;
 }) {
   const geo = useBinGeometry(file);
   const ref = useRef<THREE.Group>(null);
@@ -54,7 +58,7 @@ export function BinMesh({ file, at, rot, color, selected, ghost, valid = true, o
   });
   const c = ghost ? (valid ? "#4ade80" : "#f87171") : color;
   return (
-    <group ref={ref} rotation={[0, 0, rot ? Math.PI / 2 : 0]} onPointerDown={onPointerDown} onClick={onClick}>
+    <group ref={ref} rotation={[0, 0, rot ? Math.PI / 2 : 0]} onPointerDown={onPointerDown} onClick={onClick} onDoubleClick={onDoubleClick} onPointerOver={onPointerOver} onPointerOut={onPointerOut}>
       {geo ? (
         <mesh geometry={geo} castShadow={!ghost} receiveShadow={!ghost}>
           <meshStandardMaterial
@@ -64,8 +68,8 @@ export function BinMesh({ file, at, rot, color, selected, ghost, valid = true, o
             transparent={ghost}
             opacity={ghost ? 0.45 : 1}
             depthWrite={!ghost}
-            emissive={selected ? "#ffffff" : c}
-            emissiveIntensity={selected ? 0.18 : ghost ? 0.35 : 0}
+            emissive={selected || hovered ? "#ffffff" : c}
+            emissiveIntensity={selected ? 0.18 : hovered ? 0.09 : ghost ? 0.35 : 0}
           />
         </mesh>
       ) : null}

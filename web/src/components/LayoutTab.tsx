@@ -270,7 +270,7 @@ function Library({ armed, onArm, onFill, maxU }: { armed: string | null; onArm: 
           </select>
         </div>
       )}
-      <p className="hint">{t("Click a size, then click on the plate (or drag it there). R turns, Del removes, arrows move, ⌘Z undoes.")}</p>
+      <p className="hint">{t("Click a size, then click on the plate (or drag it there). R turns (also while dragging), F or a double-click zooms in, Del removes, arrows move, ⌘Z undoes.")}</p>
     </div>
   );
 }
@@ -287,7 +287,8 @@ export function LayoutTab() {
   const [armed, setArmed] = useState<string | null>(null);
   const [armedRot, setArmedRot] = useState<0 | 1>(0);
   const [hover, setHover] = useState<[number, number] | null>(null);
-  const [drag, setDrag] = useState<{ id: string; dx: number; dy: number; x: number; y: number } | null>(null);
+  const [drag, setDrag] = useState<{ id: string; dx: number; dy: number; x: number; y: number; rot: 0 | 1 } | null>(null);
+  const [hoverBin, setHoverBin] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [busy, setBusy] = useState(false);
   const controls = useRef<Controls>(null);
@@ -322,7 +323,7 @@ export function LayoutTab() {
   const ghost: Cand | null = drag
     ? (() => {
         const b = layout.bins.find((x) => x.id === drag.id);
-        return b ? { file: b.file, x: drag.x, y: drag.y, rot: b.rot } : null;
+        return b ? { file: b.file, x: drag.x, y: drag.y, rot: drag.rot } : null;
       })()
     : armedInfo && hover
       ? (() => {
@@ -349,6 +350,16 @@ export function LayoutTab() {
   const selNow = () => layout.bins.find((b) => b.id === selected);
   const turn = () => {
     if (armed) return setArmedRot(armedRot ? 0 : 1);
+    if (drag) {
+      // turn the bin in hand about its footprint's centre, kept on the grid
+      const b = layout.bins.find((x) => x.id === drag.id);
+      const info = b && lib.get(b.file);
+      if (!info) return;
+      const rot = (drag.rot ? 0 : 1) as 0 | 1;
+      const [w0, d0] = fp(info, drag.rot);
+      const [x, y] = snap((drag.x + w0 / 2) * PITCH, (drag.y + d0 / 2) * PITCH, info, rot, g);
+      return setDrag({ ...drag, rot, x, y });
+    }
     const sel = selNow();
     if (!sel) return;
     const c = { ...sel, rot: (sel.rot ? 0 : 1) as 0 | 1 };
@@ -358,12 +369,35 @@ export function LayoutTab() {
   const copy = () => {
     const sel = selNow();
     if (!sel) return;
-    // the next free spot for a copy, scanning from the bottom left
+    // right beside the original (right, behind, left, in front), else the next free spot from the front left
+    const [w, d] = fp(lib.get(sel.file)!, sel.rot);
+    for (const [dx, dy] of [[w, 0], [0, d], [-w, 0], [0, -d]]) if (place({ file: sel.file, x: sel.x + dx, y: sel.y + dy, rot: sel.rot })) return;
     const st = whole(lib.get(sel.file)!) ? 1 : 0.5;
     for (let y = 0; y <= g.cellsY; y += st)
       for (let x = 0; x <= g.cellsX; x += st) if (place({ file: sel.file, x, y, rot: sel.rot })) return;
     toast(t("No free spot for a copy"));
   };
+
+  // the camera onto one bin (double-click, F), keeping the current viewing direction
+  const frameBin = (b: Placed) => {
+    const info = lib.get(b.file);
+    const c = controls.current;
+    if (!info || !c) return;
+    const [w, d] = fp(info, b.rot);
+    const box = new THREE.Box3(new THREE.Vector3(b.x * PITCH, b.y * PITCH, top - SEAT), new THREE.Vector3((b.x + w) * PITCH, (b.y + d) * PITCH, top - SEAT + 7 * info.h + 4));
+    // padding in world units: room around the bin, more on the right where the panels float over the view
+    const m = Math.max(w, d) * PITCH;
+    void c.fitToBox(box, true, { paddingTop: m * 0.8, paddingBottom: m * 0.8, paddingLeft: m * 0.8, paddingRight: m * 1.6 });
+  };
+
+  // the pointer says what a click does: grab a bin, grabbing while dragging, place while a size is armed
+  useEffect(() => {
+    const cur = drag ? "grabbing" : armed ? "crosshair" : hoverBin ? "grab" : "";
+    document.body.style.cursor = cur;
+    return () => {
+      document.body.style.cursor = "";
+    };
+  }, [drag, armed, hoverBin]);
 
   // keyboard
   useEffect(() => {
@@ -377,6 +411,7 @@ export function LayoutTab() {
       const sel = layout.bins.find((b) => b.id === selected);
       if (e.key === "r" || e.key === "R") return turn();
       if (!sel) return;
+      if ((e.key === "f" || e.key === "F") && !mod) return frameBin(sel);
       if (e.key === "Delete" || e.key === "Backspace") return e.preventDefault(), editBins((b) => b.filter((x) => x.id !== sel.id)), set({ selected: null });
       const info = lib.get(sel.file)!;
       const step = whole(info) ? 1 : 0.5;
@@ -397,20 +432,23 @@ export function LayoutTab() {
     if (!drag) return;
     const up = () => {
       const b = layout.bins.find((x) => x.id === drag.id);
-      if (b && (b.x !== drag.x || b.y !== drag.y) && fits({ ...b, x: drag.x, y: drag.y }, lib.get(b.file)!, g, layout.bins, lib, b.id))
-        editBins((bs) => bs.map((x) => (x.id === b.id ? { ...x, x: drag.x, y: drag.y } : x)));
+      if (b && (b.x !== drag.x || b.y !== drag.y || b.rot !== drag.rot)) {
+        const c = { ...b, x: drag.x, y: drag.y, rot: drag.rot };
+        if (fits(c, lib.get(b.file)!, g, layout.bins, lib, b.id)) editBins((bs) => bs.map((x) => (x.id === b.id ? c : x)));
+        else toast(t("No room there"));
+      }
       setDrag(null);
       if (controls.current) controls.current.enabled = true;
     };
     window.addEventListener("pointerup", up);
     return () => window.removeEventListener("pointerup", up);
-  }, [drag, layout.bins, lib, g, editBins]);
+  }, [drag, layout.bins, lib, g, editBins]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onPlaneMove = (e: ThreeEvent<PointerEvent>) => {
     if (drag) {
       const b = layout.bins.find((x) => x.id === drag.id)!;
       const info = lib.get(b.file)!;
-      const [x, y] = snap(e.point.x - drag.dx, e.point.y - drag.dy, info, b.rot, g);
+      const [x, y] = snap(e.point.x - drag.dx, e.point.y - drag.dy, info, drag.rot, g);
       if (x !== drag.x || y !== drag.y) setDrag({ ...drag, x, y });
     } else setHover([e.point.x, e.point.y]);
   };
@@ -796,13 +834,17 @@ export function LayoutTab() {
                 rot={b.rot}
                 color={binColor(b, info, layout.colorMode)[0]}
                 selected={b.id === selected}
+                hovered={b.id === hoverBin && !drag && !armed}
                 onClick={(e) => e.stopPropagation()}   // not a click on the empty plate
+                onDoubleClick={(e) => (e.stopPropagation(), frameBin(b))}
+                onPointerOver={(e) => (e.stopPropagation(), setHoverBin(b.id))}
+                onPointerOut={() => setHoverBin((h) => (h === b.id ? null : h))}
                 onPointerDown={(e) => {
                   if (armed || e.button !== 0) return;
                   e.stopPropagation();
                   set({ selected: b.id });
                   const c = centre(b, info);
-                  setDrag({ id: b.id, dx: e.point.x - c.x, dy: e.point.y - c.y, x: b.x, y: b.y });
+                  setDrag({ id: b.id, dx: e.point.x - c.x, dy: e.point.y - c.y, x: b.x, y: b.y, rot: b.rot });
                   if (controls.current) controls.current.enabled = false;
                   void moving;
                 }}

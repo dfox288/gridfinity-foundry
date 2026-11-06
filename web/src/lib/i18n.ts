@@ -101,8 +101,8 @@ const DE: Record<string, string> = {
   "Baseplate tab settings applied (drawer size kept)": "Einstellungen vom Grundplatten-Tab übernommen (Schubladengröße bleibt)",
   Bins: "Boxen",
   "No bins for this filter": "Keine Boxen für diesen Filter",
-  "Click a size, then click on the plate (or drag it there). R turns, Del removes, arrows move, ⌘Z undoes.":
-    "Größe anklicken, dann auf die Platte klicken (oder hinziehen). R dreht, Entf löscht, Pfeiltasten verschieben, ⌘Z macht rückgängig.",
+  "Click a size, then click on the plate (or drag it there). R turns (also while dragging), F or a double-click zooms in, Del removes, arrows move, ⌘Z undoes.":
+    "Größe anklicken, dann auf die Platte klicken (oder hinziehen). R dreht (auch beim Ziehen), F oder Doppelklick zoomt hin, Entf löscht, Pfeiltasten verschieben, ⌘Z macht rückgängig.",
   "Pick a bin size on the left, then click on the plate": "Links eine Boxgröße wählen, dann auf die Platte klicken",
   "No room there": "Dort ist kein Platz",
   "No room to turn it here": "Hier ist kein Platz zum Drehen",
