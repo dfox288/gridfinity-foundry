@@ -27,7 +27,7 @@ import { HeightPicker } from "./HeightPicker";
 import { ViewButtons } from "./ViewButtons";
 import { FindBin } from "./FindBin";
 import { MOD, Shortcuts } from "./Shortcuts";
-import { type Box, type Cand, copySpot, type Edge, fits, fp, resizeBox, sameKindSized, snap, whole } from "../lib/placement";
+import { arrowAxes, type Box, type Cand, copySpot, type Edge, fits, fp, resizeBox, sameKindSized, snap, whole } from "../lib/placement";
 
 const FLEX_FIT = 0.2;   // flex label press fit (mm, total): holds in every groove bin width
 
@@ -439,7 +439,13 @@ export function LayoutTab() {
       if (e.key === "Delete" || e.key === "Backspace") return e.preventDefault(), removeGroup();
       const info = lib.get(sel.file)!;
       const step = whole(info) ? 1 : 0.5;
-      const mv: Record<string, [number, number]> = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] };
+      // arrows move along the grid axis nearest to what is up and right on the screen, so they follow the camera
+      const cam = controls.current?.camera;
+      const dir = new THREE.Vector3();
+      cam?.getWorldDirection(dir);
+      if (Math.hypot(dir.x, dir.y) < 0.2 && cam) dir.set(0, 1, 0).applyQuaternion(cam.quaternion);   // looking down: its up
+      const axes: Record<string, [number, number]> = cam ? arrowAxes(dir.x, dir.y) : arrowAxes(0, 1);
+      const mv: Record<string, [number, number]> = Object.fromEntries(Object.entries(axes).map(([k, [x, y]]) => [k, [x * step, y * step]]));
       if (mv[e.key] && multi) {
         // the group moves together, half a cell if any of them is a half bin, or not at all
         e.preventDefault();

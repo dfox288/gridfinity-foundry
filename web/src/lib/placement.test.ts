@@ -107,3 +107,20 @@ describe("sameKindSized", () => {
     expect(sameKindSized(library, mk(1, 1), 5, 5)).toBeNull();
   });
 });
+
+import { arrowAxes } from "./placement";
+
+describe("arrowAxes", () => {
+  it("is the plain mapping when looking from the front", () => {
+    expect(arrowAxes(0, 1)).toEqual({ ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowRight: [1, 0], ArrowLeft: [-1, 0] });
+  });
+  it("turns with the camera: looking from the right side (towards -x)", () => {
+    const a = arrowAxes(-1, 0.2);
+    expect(a.ArrowUp).toEqual([-1, 0]);
+    expect(a.ArrowRight).toEqual([0, 1]);
+  });
+  it("looking from the back", () => {
+    expect(arrowAxes(0.1, -1).ArrowUp).toEqual([0, -1]);
+    expect(arrowAxes(0.1, -1).ArrowRight).toEqual([-1, 0]);
+  });
+});

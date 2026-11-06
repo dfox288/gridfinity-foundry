@@ -85,3 +85,14 @@ export function sameKindSized(library: BinFile[], like: BinFile, w: number, d: n
   if (!hit) return null;
   return { file: hit, rot: Math.abs(hit.w - w) < e && Math.abs(hit.d - d) < e ? 0 : 1 };
 }
+
+// The grid directions the arrow keys stand for, as the camera sees the drawer: "up" is the grid axis nearest to the
+// screen's up direction (fx, fy: the camera's view direction on the floor, or its up vector when it looks straight
+// down), "right" a quarter turn clockwise from it. Each is a unit step [dx, dy] along x or y.
+export function arrowAxes(fx: number, fy: number): Record<"ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight", [number, number]> {
+  const v = (x: number, y: number): [number, number] => [x + 0, y + 0];   // + 0 turns -0 into 0
+  const up = Math.abs(fx) > Math.abs(fy) ? v(Math.sign(fx), 0) : v(0, fy < 0 ? -1 : 1);
+  const right = v(up[1], -up[0]);
+  const neg = (a: [number, number]) => v(-a[0], -a[1]);
+  return { ArrowUp: up, ArrowDown: neg(up), ArrowRight: right, ArrowLeft: neg(right) };
+}
