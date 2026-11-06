@@ -10,6 +10,7 @@ export function Shortcuts({ onClose }: { onClose: () => void }) {
   const rows: [string, string][] = [
     [t("Click a size, then the plate"), t("place a bin (Shift keeps the size for more)")],
     [t("Drag a bin"), t("move it")],
+    [t("Touch: hold a bin"), t("pick it up and drag it (a tap selects it)")],
     ["R", t("turn the selected bin, or the one being dragged or placed")],
     [t("Arrow keys"), t("move the selection")],
     [t("drag an orange edge handle"), t("resize the selected bin")],

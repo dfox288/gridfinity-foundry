@@ -57,6 +57,25 @@ export function LayoutTab() {
   // a bin being resized by one of its edge handles: the box as it would become
   const [resize, setResize] = useState<{ id: string; edge: Edge; start: Box; box: Box } | null>(null);
   const [hoverEdge, setHoverEdge] = useState<Edge | null>(null);
+  // a finger on a bin, waiting to see whether it is a tap, a hold (pick it up) or the start of turning the view
+  const press = useRef<{ id: string; at: [number, number]; timer: number } | null>(null);
+  useEffect(() => {
+    const move = (e: PointerEvent) => {
+      const p = press.current;
+      if (p && Math.hypot(e.clientX - p.at[0], e.clientY - p.at[1]) > 8) (clearTimeout(p.timer), (press.current = null));
+    };
+    const up = () => {
+      const p = press.current;
+      if (!p) return;
+      clearTimeout(p.timer);
+      press.current = null;
+      set({ selected: p.id });   // a tap
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => (window.removeEventListener("pointermove", move), window.removeEventListener("pointerup", up), window.removeEventListener("pointercancel", up));
+  }, [set]);
   const resized = useRef(false);   // the click that ends a resize is not a click on the empty plate
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);   // the bin's right-click menu, at the pointer
   const [help, setHelp] = useState(false);
@@ -739,10 +758,24 @@ export function LayoutTab() {
                   if (armed || e.button !== 0) return;
                   e.stopPropagation();
                   if (e.shiftKey) return toggleSelect(b.id);
-                  set({ selected: b.id });
                   const c = centre(b, info);
-                  setDrag({ id: b.id, dx: e.point.x - c.x, dy: e.point.y - c.y, x: b.x, y: b.y, rot: b.rot });
-                  if (controls.current) controls.current.enabled = false;
+                  const start = () => {
+                    set({ selected: b.id });
+                    setDrag({ id: b.id, dx: e.point.x - c.x, dy: e.point.y - c.y, x: b.x, y: b.y, rot: b.rot });
+                    if (controls.current) controls.current.enabled = false;
+                  };
+                  if (e.nativeEvent.pointerType !== "touch") return start();
+                  // touch: a tap selects, holding still picks the bin up, moving first turns the view
+                  clearTimeout(press.current?.timer);
+                  press.current = {
+                    id: b.id,
+                    at: [e.nativeEvent.clientX, e.nativeEvent.clientY],
+                    timer: window.setTimeout(() => {
+                      press.current = null;
+                      start();
+                      navigator.vibrate?.(15);
+                    }, 350),
+                  };
                   void moving;
                 }}
               />

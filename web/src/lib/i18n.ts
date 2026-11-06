@@ -13,6 +13,8 @@ const DE: Record<string, string> = {
   "Loading GridFlock…": "GridFlock wird geladen…",
   // share links
   Share: "Teilen",
+  "Touch: hold a bin": "Touch: Box gedrückt halten",
+  "pick it up and drag it (a tap selects it)": "aufnehmen und ziehen (Antippen wählt sie)",
   "No room for that size here": "Für diese Größe ist hier kein Platz",
   "There is no bin of that size": "Eine Box dieser Größe gibt es nicht",
   "not in the library": "nicht in der Bibliothek",
