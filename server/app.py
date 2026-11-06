@@ -7,7 +7,8 @@ keeps presets, builds print zips, and serves the web app.
   GET  /api/legal/<page>?lang=de|en    one as Markdown (LEGAL_DIR/<page>.<lang>.md, else the other language)
   GET  /api/catalog                    the bins, dividers and tab dividers that can be had (server/catalog.py), compact
   GET  /api/bins                       the labels and the uploaded bins (system "community")
-  GET  /api/volume?f=<file>&f=...      volume and height of library files: {file: [mm3, mm]} (filament estimate, drawer height; at most 60, unknown left out)
+  GET  /api/volume?f=<file>&f=...      volume and height of library files: {file: [mm3, mm]} (filament estimate, drawer height; at most 60 files and 4
+                                       new renders per request, the others left out: ask again for them)
   POST /api/uploads    STL bytes        upload a bin (headers X-Name, X-Creator, X-Filename, URL-encoded) -> its entry
   DELETE /api/uploads/<id>              remove an uploaded bin (its owner or an admin)
   GET  /api/me                         {auth, user, id, name, admin, admins}: whether sign-in is on, and who is calling
@@ -55,6 +56,7 @@ LABELS = Path(os.environ.get("LABELS_DIR", "/labels")).resolve()   # gridfinity-
 DATA = Path(os.environ.get("DATA_DIR", "/data")).resolve()
 WEB = Path(os.environ.get("WEB_DIR", "/app/web")).resolve()
 CACHE = Path(os.environ.get("CACHE_DIR", str(DATA / "cache"))).resolve()
+VOLUME_RENDERS = 4   # new catalog renders one /api/volume request may cause (each about a second)
 GEN_SCAD = Path(os.environ.get("GENERATOR_SCAD", "/app/generator/scad")).resolve()   # flex_label.scad (engraved labels)
 LEGAL = Path(os.environ.get("LEGAL_DIR", str(DATA / "legal"))).resolve()   # imprint.de.md, privacy.en.md, ...
 LEGAL_PAGES = ("imprint", "privacy")
@@ -429,8 +431,14 @@ class Handler(SimpleHTTPRequestHandler):
             if path == "/api/catalog" and method == "GET":
                 return self.send_json(catalog.catalog())
             if path == "/api/volume" and method == "GET":
-                out = {}
+                out, renders = {}, 0
                 for rel in parse_qs(urlparse(self.path).query).get("f", [])[:60]:
+                    # at most VOLUME_RENDERS bins not rendered yet per request: the page asks again for the rest
+                    on_disk = (BINS / rel).is_file() or rel.startswith(("labels/", "uploads/"))
+                    if not on_disk and catalog.rendered(rel, CACHE / "catalog") is False:
+                        if renders >= VOLUME_RENDERS:
+                            continue
+                        renders += 1
                     try:
                         v, h = volume.measure_file(bin_file(rel))
                         out[rel] = [round(v, 1), round(h, 2)]

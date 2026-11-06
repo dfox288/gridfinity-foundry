@@ -93,6 +93,15 @@ def _base(openscad, root, system, w, d, h):
     return out
 
 
+def rendered(rel, root):
+    """True if a catalog name is already in the cache under root, False if it would have to be rendered, None if rel is
+    not a catalog name at all"""
+    rel = OLD.sub(lambda m: f"{RENAMED[m[1]]}/print-bin-{RENAMED[m[1]]}_", rel)
+    if not (BIN.fullmatch(rel) or DIVIDER.fullmatch(rel) or TAB.fullmatch(rel)):
+        return None
+    return (root / rel).exists()
+
+
 def path(rel, root, openscad):
     """the file for a catalog name under root (the cache), rendered if missing; None if rel is not in the catalog"""
     rel = OLD.sub(lambda m: f"{RENAMED[m[1]]}/print-bin-{RENAMED[m[1]]}_", rel)

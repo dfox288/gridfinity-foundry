@@ -27,21 +27,28 @@ export function useVolumes(files: string[]): Map<string, number> {
     want.forEach((f) => pending.add(f));
     let alive = true;
     (async () => {
-      for (let i = 0; i < want.length; i += 60) {
-        const chunk = want.slice(i, i + 60);
+      // the server renders only a few new bins per request and leaves the rest out: ask again while that brings
+      // new answers (files it does not know never come back, so this ends)
+      let left = want;
+      for (let round = 0; left.length && round < 30; round++) {
+        const chunk = left.slice(0, 60);
+        let got = 0;
         try {
           const r = await fetch(`/api/volume?${chunk.map((f) => `f=${encodeURIComponent(f)}`).join("&")}`);
           const d = (await r.json()) as Record<string, [number, number]>;
           for (const [f, [v, h]] of Object.entries(d)) {
             known.set(f, v);
             heights.set(f, h);
+            got++;
           }
         } catch {
           /* no estimate then */
-        } finally {
-          chunk.forEach((f) => pending.delete(f));
         }
+        if (alive && got) bump((n) => n + 1);
+        // nothing came back for this batch: those files are unknown, go on with the others
+        left = left.filter((f) => !known.has(f) && (got > 0 || !chunk.includes(f)));
       }
+      want.forEach((f) => pending.delete(f));
       if (alive) bump((n) => n + 1);
     })();
     return () => {
