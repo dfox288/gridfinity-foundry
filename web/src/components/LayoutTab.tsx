@@ -1039,7 +1039,7 @@ export function LayoutTab() {
                     }),
                   };
                 });
-                const html = drawerMapHtml(layoutPreset ?? t("Drawer map"), maps, { front: t("front"), bins: t("bins"), empty: t("No bins yet") });
+                const html = drawerMapHtml(layoutPreset ?? t("Drawer map"), maps, { front: t("front"), bins: t("bins"), empty: t("No bins yet"), cards: t("Cards for the drawer fronts") });
                 const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
                 if (!window.open(url, "_blank")) download(new Blob([html], { type: "text/html" }), fileName(layoutPreset, "layout", "html", "map"));
                 setTimeout(() => URL.revokeObjectURL(url), 60000);

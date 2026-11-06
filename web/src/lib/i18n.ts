@@ -20,6 +20,7 @@ const DE: Record<string, string> = {
   "Drawer map to print": "Schubladenplan zum Ausdrucken",
   "A top view of each drawer with every bin's label, to print and stick inside the cabinet": "Draufsicht jeder Schublade mit den Beschriftungen der Boxen, zum Ausdrucken und Aufkleben in den Schrank",
   "Drawer map": "Schubladenplan",
+  "Cards for the drawer fronts": "Kärtchen für die Schubladenfronten",
   front: "vorne",
   bins: "Boxen",
   "Fill gaps": "Lücken füllen",

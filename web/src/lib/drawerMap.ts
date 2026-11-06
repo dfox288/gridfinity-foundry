@@ -57,7 +57,18 @@ function svg(d: MapDrawer, front: string) {
   return out.join("");
 }
 
-export function drawerMapHtml(title: string, drawers: MapDrawer[], tr: { front: string; bins: string; empty: string }) {
+// small cards for the drawer fronts: name and contents, cut out and taped on
+function cards(drawers: MapDrawer[], heading: string) {
+  const list = drawers.filter((d) => d.bins.some((b) => b.text));
+  if (!list.length) return "";
+  const card = (d: MapDrawer) => {
+    const labels = [...new Set(d.bins.map((b) => b.text).filter(Boolean))];
+    return `<div class="card"><b>${esc(d.name)}</b><span>${labels.map(esc).join(" · ")}</span></div>`;
+  };
+  return `<section class="cards-page"><header><h1>${esc(heading)}</h1></header><div class="cards">${list.map(card).join("")}</div></section>`;
+}
+
+export function drawerMapHtml(title: string, drawers: MapDrawer[], tr: { front: string; bins: string; empty: string; cards: string }) {
   const pages = drawers
     .map(
       (d) => `<section>
@@ -65,7 +76,7 @@ export function drawerMapHtml(title: string, drawers: MapDrawer[], tr: { front: 
   ${d.bins.length ? svg(d, tr.front) : `<p class="empty">${esc(tr.empty)}</p>`}
 </section>`,
     )
-    .join("\n");
+    .join("\n") + cards(drawers, tr.cards);
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>
   @page { size: A4; margin: 12mm; }
@@ -78,6 +89,10 @@ export function drawerMapHtml(title: string, drawers: MapDrawer[], tr: { front: 
   svg { width: 100%; max-height: 240mm; display: block; }
   svg text { font-family: inherit; }
   .empty { color: #777; }
+  .cards { display: grid; grid-template-columns: repeat(2, 85mm); gap: 4mm; }
+  .card { height: 30mm; box-sizing: border-box; border: 0.3mm dashed #999; padding: 3mm 4mm; display: flex; flex-direction: column; gap: 1.5mm; overflow: hidden; }
+  .card b { font-size: 13pt; letter-spacing: 0.04em; text-transform: uppercase; }
+  .card span { font-size: 8pt; line-height: 1.3; color: #333; }
   @media screen { body { max-width: 190mm; margin: 0 auto; padding: 0 8mm; } }
 </style></head><body>
 ${pages}
