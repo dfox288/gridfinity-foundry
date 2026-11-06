@@ -36,6 +36,7 @@ export function Scene({
   const dark = theme === "dark";
   return (
     <Canvas
+      className="scene"
       shadows
       dpr={[1, 2]}
       camera={{ fov: 32, near: 1, far: 20000, position: [250, -500, 450] }}

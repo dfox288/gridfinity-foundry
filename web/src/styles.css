@@ -378,3 +378,21 @@ a.signin { padding: 4px 10px; border: 1px solid var(--line-2); border-radius: 99
   font-size: 13px; color: var(--muted); white-space: nowrap;
 }
 .examples .ghost.small { border-radius: 999px; color: var(--text, inherit); }
+
+/* phones: one column that scrolls; the 3D view on top, its panels and the sidebar below it */
+@media (max-width: 640px) {
+  html, body, #root { height: auto; }
+  .app { height: auto; min-height: 100%; }
+  .topbar { height: auto; flex-wrap: wrap; padding: 8px 16px; row-gap: 8px; gap: 10px; }
+  .top-right { gap: 8px; flex-wrap: wrap; margin-left: 0; }
+  .tabs button { padding: 6px 12px; }
+  .workspace { flex-direction: column-reverse; }
+  .stage { flex: none; display: flex; flex-direction: column; }
+  .stage .scene { height: 58vh !important; flex: none; }
+  .hud { position: static; width: auto; max-height: none; overflow: visible; padding: 12px 16px; }
+  .sidebar { max-height: none; }
+  .stage-tip { display: none; }
+  .examples { top: calc(58vh - 52px); bottom: auto; padding: 5px; max-width: calc(100% - 32px); }
+  .examples > span { display: none; }
+  .drawer-tabs { top: 56px; max-width: calc(100% - 28px); }
+}
