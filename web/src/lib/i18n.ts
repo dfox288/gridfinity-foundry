@@ -13,6 +13,9 @@ const DE: Record<string, string> = {
   "Loading GridFlock…": "GridFlock wird geladen…",
   // share links
   Share: "Teilen",
+  "No bin fits under the drawer height": "Unter die Schubladenhöhe passt keine Box",
+  "{h}U is too tall for this drawer: up to {max}U fit": "{h}U ist zu hoch für diese Schublade: bis {max}U passen",
+  "Up to {max}U fit this drawer": "Bis {max}U passen in diese Schublade",
   "Height (optional)": "Höhe (optional)",
   "Inside, from the drawer floor to what is above it; bins that stick out are marked": "Innen, vom Schubladenboden bis zu dem, was darüber ist; Boxen, die herausragen, werden markiert",
   "{n} too tall · tallest {h} mm": "{n} zu hoch · höchste {h} mm",

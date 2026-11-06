@@ -119,7 +119,7 @@ function SelectionFrame({ x, y, w, d, z, h, color = "#ffffff" }: { x: number; y:
   );
 }
 
-function Library({ armed, onArm, onFill }: { armed: string | null; onArm: (f: string | null) => void; onFill: (bins: BinFile[], max: [number, number]) => void }) {
+function Library({ armed, onArm, onFill, maxU }: { armed: string | null; onArm: (f: string | null) => void; onFill: (bins: BinFile[], max: [number, number]) => void; maxU?: number }) {
   const bins = useStore((s) => s.bins);
   useStore((s) => s.me);   // re-render on sign-in (canChange)
   const t = useT();
@@ -157,7 +157,7 @@ function Library({ armed, onArm, onFill }: { armed: string | null; onArm: (f: st
                 <button key={k} className={k === kind ? "on" : ""} onClick={() => setKind(k)}>{t(k)}</button>
               ))}
             </div>
-            <HeightPicker value={h} onChange={(x) => x !== null && setH(x)} />
+            <HeightPicker value={h} onChange={(x) => x !== null && setH(x)} maxU={maxU} />
           </>
         )}
       </div>
@@ -253,6 +253,11 @@ function Library({ armed, onArm, onFill }: { armed: string | null; onArm: (f: st
         })}
         {list.length === 0 && <div className="empty">{t(community ? "No uploaded bins yet" : "No bins for this filter")}</div>}
       </div>
+      {!community && maxU !== undefined && (
+        <p className={`hint ${h > maxU ? "bad" : ""}`}>
+          {maxU < 1 ? t("No bin fits under the drawer height") : h > maxU ? t("{h}U is too tall for this drawer: up to {max}U fit", { h, max: maxU }) : t("Up to {max}U fit this drawer", { max: maxU })}
+        </p>
+      )}
       {!community && (
         <div className="fill-row">
           <button className="ghost small" disabled={!list.length} onClick={() => onFill(list, fillMax.split("x").map(Number) as [number, number])} title={t("Fills every free spot with the biggest of these bins that fits; one undo takes it back")}>
@@ -510,6 +515,15 @@ export function LayoutTab() {
       })
     : [];
   const tallest = Math.max(0, ...layout.bins.map((b) => topOf(b.file) ?? 0));
+  // the tallest bin height (units) that fits under the drawer: 7 mm per unit plus the stacking lip, measured from a mesh
+  const lip = (() => {
+    for (const b of layout.bins) {
+      const i = lib.get(b.file);
+      if (i && heights.has(b.file)) return heights.get(b.file)! - 7 * i.h;
+    }
+    return 3.75;   // a 6U bin is 45.75 mm
+  })();
+  const maxU = layout.height ? Math.floor((layout.height - (top - SEAT) - lip + 0.01) / 7) : undefined;
   const est = (() => {
     let g = 0, mm3 = 0, missing = 0;
     const add = (file: string, count: number, filament?: string) => {
@@ -691,6 +705,7 @@ export function LayoutTab() {
         <div className="card">
           <h3>{t("Bins")}</h3>
           <Library
+            maxU={maxU}
             armed={armed}
             onArm={(f) => (setArmed(f), set({ selected: null }))}
             onFill={(cands, max) => {
