@@ -4,15 +4,33 @@ import { LayoutTab } from "./components/LayoutTab";
 import { LegalLinks } from "./components/Legal";
 import { PlateTab } from "./components/PlateTab";
 import { translate } from "./lib/i18n";
+import { decodeShare, sharedCode, shareUrl } from "./lib/share";
 import { loadProject, project, toProject, useStore } from "./store";
 
 const DRAFT = "gridfinity-studio-draft";
+
+// opens the project of a share link in the URL, if there is one
+function openShared() {
+  const code = sharedCode();
+  if (!code) return false;
+  const { set, toast } = useStore.getState();
+  const tr = (en: string) => translate(useStore.getState().lang, en);
+  decodeShare(code)
+    .then((d) => {
+      set({ plate: d.plate, tab: d.tab ?? "layout", platePreset: null, layoutPreset: null, ...(d.printer ? { printer: d.printer } : {}) });
+      loadProject(d.project);
+      toast(tr("Opened a shared project"));
+    })
+    .catch(() => toast(tr("This share link is broken"), "error"))
+    .finally(() => history.replaceState(null, "", location.pathname + location.search));
+  return true;
+}
 
 export function App() {
   const { tab, theme, lang, toasts, schema, me, providers, set, toast } = useStore();
   // a user with an @ came in through Google, the others through GitHub
   const via = providers.find((p) => p.id === (me.user?.includes("@") ? "google" : "github")) ?? providers[0];
-  const t = (en: string) => translate(lang, en);
+  const t = (en: string, vars?: Record<string, string | number>) => translate(lang, en, vars);
 
   useEffect(() => {
     api.schema().then((schema) => set({ schema })).catch((e) => toast(`Schema: ${e.message}`, "error"));
@@ -20,6 +38,8 @@ export function App() {
     api.printers().then((printers) => set({ printers })).catch(() => {});
     api.me().then((me) => set({ me })).catch(() => {});
     api.providers().then((providers) => set({ providers }));
+    // a share link wins over the draft; once the shared project is changed it becomes the draft
+    if (openShared()) return;
     // the unsaved work of the last visit (this browser only)
     try {
       const d = JSON.parse(localStorage.getItem(DRAFT) ?? "null");
@@ -31,6 +51,13 @@ export function App() {
       /* no draft */
     }
   }, [set, toast]);
+
+  // a link pasted into the address bar of an open tab only changes the hash
+  useEffect(() => {
+    const on = () => openShared();
+    addEventListener("hashchange", on);
+    return () => removeEventListener("hashchange", on);
+  }, []);
 
   useEffect(
     () =>
@@ -82,6 +109,22 @@ export function App() {
           <span className="credit">
             {t("plates by")} <a href="https://github.com/yawkat/gridflock" target="_blank" rel="noreferrer">GridFlock</a>
           </span>
+          <button
+            className="ghost small share"
+            title={t("Copy a link to this project: baseplate, all drawers and bins")}
+            onClick={async () => {
+              const s = useStore.getState();
+              const url = await shareUrl({ plate: s.plate, printer: s.printer, tab: s.tab });
+              try {
+                await navigator.clipboard.writeText(url);
+                toast(t("Link copied ({n} characters)", { n: String(url.length) }));
+              } catch {
+                prompt(t("Copy this link"), url);
+              }
+            }}
+          >
+            {t("Share")}
+          </button>
           <LegalLinks />
           {me.auth &&
             (me.user ? (

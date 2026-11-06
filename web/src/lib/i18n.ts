@@ -11,6 +11,13 @@ const DE: Record<string, string> = {
   "plates by": "Platten von",
   "Light / dark": "Hell / dunkel",
   "Loading GridFlock…": "GridFlock wird geladen…",
+  // share links
+  Share: "Teilen",
+  "Copy a link to this project: baseplate, all drawers and bins": "Link auf dieses Projekt kopieren: Grundplatte, alle Schubladen und Kisten",
+  "Link copied ({n} characters)": "Link kopiert ({n} Zeichen)",
+  "Copy this link": "Diesen Link kopieren",
+  "Opened a shared project": "Geteiltes Projekt geöffnet",
+  "This share link is broken": "Dieser Link ist beschädigt",
   // presets
   Preset: "Vorlage",
   Unsaved: "Nicht gespeichert",

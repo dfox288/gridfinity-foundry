@@ -26,6 +26,8 @@ onto it, and download everything as STL files or as a Bambu Studio project with 
   part packed onto build plates of your printer's size, one plate per colour, or one file per plate.
 - **Printers**: every Bambu Lab printer and nozzle from Bambu Studio's profiles sets the bed size. A Bambu project needs
   a template of that printer's settings (see below); the P1S 0.6 mm one is included.
+- **Share links**: "Share" copies a link that holds the whole project (baseplate, drawers, bins, labels, colours) in
+  the URL itself; whoever opens it gets the project, without signing in and without anything stored on the server.
 - **Presets** for plates and layouts, saved on the server. English and German. Light and dark theme.
 
 ![Baseplate](docs/baseplate.png)
