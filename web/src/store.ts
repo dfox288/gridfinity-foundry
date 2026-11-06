@@ -21,6 +21,7 @@ export interface Layout {
   colorMode: ColorMode;
   plateFilament?: [string, string];   // [name, hex] of the baseplate, e.g. ["PLA Basic · Gray", "#8E9089"]
   parts?: PartLine[];                 // dividers and labels to print with it
+  height?: number;                    // the drawer's inner height, mm (optional): taller bins are flagged
 }
 
 export interface PartLine {

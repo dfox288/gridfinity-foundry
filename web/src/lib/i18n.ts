@@ -13,6 +13,11 @@ const DE: Record<string, string> = {
   "Loading GridFlock…": "GridFlock wird geladen…",
   // share links
   Share: "Teilen",
+  "Height (optional)": "Höhe (optional)",
+  "Inside, from the drawer floor to what is above it; bins that stick out are marked": "Innen, vom Schubladenboden bis zu dem, was darüber ist; Boxen, die herausragen, werden markiert",
+  "{n} too tall · tallest {h} mm": "{n} zu hoch · höchste {h} mm",
+  "tallest bin {h} mm": "höchste Box {h} mm",
+  "Too tall for the drawer": "Zu hoch für die Schublade",
   "Find a bin by its label…": "Box nach Beschriftung suchen…",
   "Nothing found": "Nichts gefunden",
   "{n} more": "{n} weitere",

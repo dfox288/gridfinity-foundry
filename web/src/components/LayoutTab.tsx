@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { api, bambuProject, download, fileName, type BinFile, type ParamValue } from "../api";
 import { grid, PITCH, type Grid } from "../lib/grid";
 import { usePlate } from "../lib/usePlate";
-import { fmtGrams, grams, metres, useVolumes } from "../lib/filament";
+import { fmtGrams, grams, heights, metres, useVolumes } from "../lib/filament";
 import { meshVolume } from "../lib/stl";
 import { fill } from "../lib/fill";
 import { drawerMapHtml } from "../lib/drawerMap";
@@ -110,11 +110,11 @@ function GridLines({ g, z, dark }: { g: Grid; z: number; dark: boolean }) {
   );
 }
 
-function SelectionFrame({ x, y, w, d, z, h }: { x: number; y: number; w: number; d: number; z: number; h: number }) {
+function SelectionFrame({ x, y, w, d, z, h, color = "#ffffff" }: { x: number; y: number; w: number; d: number; z: number; h: number; color?: string }) {
   const geo = useMemo(() => new THREE.EdgesGeometry(new THREE.BoxGeometry(w * PITCH + 2, d * PITCH + 2, h + 2)), [w, d, h]);
   return (
     <lineSegments geometry={geo} position={[(x + w / 2) * PITCH, (y + d / 2) * PITCH, z + h / 2]}>
-      <lineBasicMaterial color="#ffffff" transparent opacity={0.9} />
+      <lineBasicMaterial color={color} transparent opacity={0.9} />
     </lineSegments>
   );
 }
@@ -500,6 +500,16 @@ export function LayoutTab() {
     if (!plateVol || !own) return 0;
     return grams((plateVol * area(d.layout.plate)) / own, (d.layout.plateFilament ?? PLATE_DEFAULT)[0]);
   };
+  // drawer height check: a bin's top over the drawer floor = the plate's top - the seat + the bin's own height
+  useVolumes(layout.bins.map((b) => b.file));   // fills `heights` for this drawer's bins
+  const topOf = (file: string) => (heights.has(file) ? top - SEAT + heights.get(file)! : null);
+  const tooTall = layout.height
+    ? layout.bins.filter((b) => {
+        const z = topOf(b.file);
+        return z !== null && z > layout.height! + 0.01;
+      })
+    : [];
+  const tallest = Math.max(0, ...layout.bins.map((b) => topOf(b.file) ?? 0));
   const est = (() => {
     let g = 0, mm3 = 0, missing = 0;
     const add = (file: string, count: number, filament?: string) => {
@@ -628,6 +638,24 @@ export function LayoutTab() {
               <input type="number" value={size?.[1] ?? 0} onChange={(e) => setLayoutPlate("plate_size", [size[0], +e.target.value])} />
             </label>
             <span className="unit">mm</span>
+          </div>
+          <div className="drawer-row">
+            <label title={t("Inside, from the drawer floor to what is above it; bins that stick out are marked")}>
+              <span>{t("Height (optional)")}</span>
+              <input
+                type="number"
+                placeholder="–"
+                value={layout.height ?? ""}
+                onChange={(e) => set({ layout: { ...layout, height: e.target.value === "" || +e.target.value <= 0 ? undefined : +e.target.value } })}
+              />
+            </label>
+            <span className="unit">mm</span>
+            <span className={`height-note ${tooTall.length ? "bad" : ""}`}>
+              {layout.bins.length > 0 && tallest > 0 &&
+                (tooTall.length
+                  ? t("{n} too tall · tallest {h} mm", { n: tooTall.length, h: tallest.toFixed(0) })
+                  : t("tallest bin {h} mm", { h: tallest.toFixed(0) }))}
+            </span>
           </div>
           <PrinterPicker />
           <div className="drawer-row">
@@ -767,6 +795,19 @@ export function LayoutTab() {
             );
           })}
           {ghost && <BinMesh key={`ghost-${ghost.file}`} file={ghost.file} at={centre(ghost, lib.get(ghost.file)!)} rot={ghost.rot} color="#fff" ghost valid={ghostOk} />}
+          {/* the drawer's inner height as a faint plane, bins that reach through it framed in red */}
+          {layout.height && tooTall.length > 0 && (
+            <mesh position={[(g.cellsX * PITCH) / 2, (g.cellsY * PITCH) / 2, layout.height]}>
+              <planeGeometry args={[g.cellsX * PITCH + 20, g.cellsY * PITCH + 20]} />
+              <meshBasicMaterial color="#ef4444" transparent opacity={0.12} side={THREE.DoubleSide} depthWrite={false} />
+            </mesh>
+          )}
+          {tooTall.map((b) => {
+            const i = lib.get(b.file);
+            if (!i) return null;
+            const [w, d] = fp(i, b.rot);
+            return <SelectionFrame key={`tall-${b.id}`} x={b.x} y={b.y} w={w} d={d} z={top - SEAT} h={heights.get(b.file) ?? 7 * i.h + 4} color="#ef4444" />;
+          })}
           {sel && selInfo && !drag && (() => {
             const [w, d] = fp(selInfo, sel.rot);
             return <SelectionFrame x={sel.x} y={sel.y} w={w} d={d} z={top - SEAT} h={7 * selInfo.h + 4} />;

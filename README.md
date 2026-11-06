@@ -20,6 +20,8 @@ onto it, and download everything as STL files or as a Bambu Studio project with 
   (up to a size you pick, e.g. 2×2); one undo takes them all back.
 - **Examples**: an empty layout offers two example drawers (screws in an IKEA ALEX, electronics in a HELMER) to start
   from.
+- **Drawer height**: give the drawer's inner height and bins that would stick out are framed in red (heights measured
+  from the bins' meshes, standing in the baseplate).
 - **Your own bins**: drop any Gridfinity STL onto the plate (or into the Community section). It is centred, measured
   against the grid and added to the library on the server with your name, for everyone using that installation.
 - **Engraved labels**: every labelled flex bin gets its flex label with the text engraved (sized to fit), in the print

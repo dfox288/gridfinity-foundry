@@ -13,10 +13,11 @@ export function density(filament?: string) {
 export const grams = (mm3: number, filament?: string) => (mm3 / 1000) * density(filament);
 export const metres = (mm3: number) => mm3 / FILAMENT_MM2 / 1000;
 
-const known = new Map<string, number>();
+const known = new Map<string, number>();     // volume, mm^3
+export const heights = new Map<string, number>();   // overall height of the part, mm
 const pending = new Set<string>();
 
-// volumes of library files; re-renders when new ones arrive
+// volumes (and heights, in `heights`) of library files; re-renders when new ones arrive
 export function useVolumes(files: string[]): Map<string, number> {
   const [, bump] = useState(0);
   const key = [...new Set(files)].sort().join("|");
@@ -30,8 +31,11 @@ export function useVolumes(files: string[]): Map<string, number> {
         const chunk = want.slice(i, i + 60);
         try {
           const r = await fetch(`/api/volume?${chunk.map((f) => `f=${encodeURIComponent(f)}`).join("&")}`);
-          const d = (await r.json()) as Record<string, number>;
-          for (const [f, v] of Object.entries(d)) known.set(f, v);
+          const d = (await r.json()) as Record<string, [number, number]>;
+          for (const [f, [v, h]] of Object.entries(d)) {
+            known.set(f, v);
+            heights.set(f, h);
+          }
         } catch {
           /* no estimate then */
         } finally {

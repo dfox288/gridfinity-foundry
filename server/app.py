@@ -7,7 +7,7 @@ keeps presets, builds print zips, and serves the web app.
   GET  /api/legal/<page>?lang=de|en    one as Markdown (LEGAL_DIR/<page>.<lang>.md, else the other language)
   GET  /api/catalog                    the bins, dividers and tab dividers that can be had (server/catalog.py), compact
   GET  /api/bins                       the labels and the uploaded bins (system "community")
-  GET  /api/volume?f=<file>&f=...      solid volume of library files in mm^3: {file: mm3} (filament estimate; at most 60, unknown files left out)
+  GET  /api/volume?f=<file>&f=...      volume and height of library files: {file: [mm3, mm]} (filament estimate, drawer height; at most 60, unknown left out)
   POST /api/uploads    STL bytes        upload a bin (headers X-Name, X-Creator, X-Filename, URL-encoded) -> its entry
   DELETE /api/uploads/<id>              remove an uploaded bin (its owner or an admin)
   GET  /api/me                         {auth, user, id, name, admin, admins}: whether sign-in is on, and who is calling
@@ -432,7 +432,8 @@ class Handler(SimpleHTTPRequestHandler):
                 out = {}
                 for rel in parse_qs(urlparse(self.path).query).get("f", [])[:60]:
                     try:
-                        out[rel] = round(volume.of_file(bin_file(rel)), 1)
+                        v, h = volume.measure_file(bin_file(rel))
+                        out[rel] = [round(v, 1), round(h, 2)]
                     except (ValueError, OSError):
                         pass
                 return self.send_json(out)
