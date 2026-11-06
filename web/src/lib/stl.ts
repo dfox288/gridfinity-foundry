@@ -122,3 +122,13 @@ export function toStl(parts: Float32Array[]): Blob {
   }
   return new Blob([buf], { type: "model/stl" });
 }
+
+// solid volume of a closed mesh in mm^3 (sum of the tetrahedra its triangles span with the origin)
+export function meshVolume(pos: Float32Array): number {
+  let v = 0;
+  for (let i = 0; i + 8 < pos.length; i += 9) {
+    const [ax, ay, az, bx, by, bz, cx, cy, cz] = pos.subarray(i, i + 9);
+    v += ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
+  }
+  return Math.abs(v / 6);
+}

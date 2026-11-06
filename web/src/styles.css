@@ -366,3 +366,7 @@ a.signin { padding: 4px 10px; border: 1px solid var(--line-2); border-radius: 99
 .bom-labels { color: var(--accent) !important; }
 .labels-toggle { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); margin: 2px 0 6px; cursor: pointer; }
 .labels-toggle input { accent-color: var(--accent); }
+.bom-row > b { display: flex; flex-direction: column; align-items: flex-end; }
+.bom-g { font-weight: 400; font-size: 11px; color: var(--muted, #8a8f98); white-space: nowrap; }
+.bom-total { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 2px 4px; margin-top: 4px; border-top: 1px solid var(--line-2); font-size: 13px; }
+.bom-total b { font-variant-numeric: tabular-nums; }

@@ -13,6 +13,8 @@ const DE: Record<string, string> = {
   "Loading GridFlock…": "GridFlock wird geladen…",
   // share links
   Share: "Teilen",
+  "Filament, about": "Filament, etwa",
+  "From the solid volume of each part; infill makes the real amount somewhat lower": "Aus dem Volumen jedes Teils; durch die Füllung wird es in Wirklichkeit etwas weniger",
   "Copy a link to this project: baseplate, all drawers and bins": "Link auf dieses Projekt kopieren: Grundplatte, alle Schubladen und Kisten",
   "Link copied ({n} characters)": "Link kopiert ({n} Zeichen)",
   "Copy this link": "Diesen Link kopieren",

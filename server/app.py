@@ -7,6 +7,7 @@ keeps presets, builds print zips, and serves the web app.
   GET  /api/legal/<page>?lang=de|en    one as Markdown (LEGAL_DIR/<page>.<lang>.md, else the other language)
   GET  /api/catalog                    the bins, dividers and tab dividers that can be had (server/catalog.py), compact
   GET  /api/bins                       the labels and the uploaded bins (system "community")
+  GET  /api/volume?f=<file>&f=...      solid volume of library files in mm^3: {file: mm3} (filament estimate; at most 60, unknown files left out)
   POST /api/uploads    STL bytes        upload a bin (headers X-Name, X-Creator, X-Filename, URL-encoded) -> its entry
   DELETE /api/uploads/<id>              remove an uploaded bin (its owner or an admin)
   GET  /api/me                         {auth, user, id, name, admin, admins}: whether sign-in is on, and who is calling
@@ -42,10 +43,11 @@ import bambu3mf
 import bbl_profiles
 import catalog
 import uploads
+import volume
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 GRIDFLOCK = Path(os.environ.get("GRIDFLOCK_DIR", "/opt/gridflock")).resolve()
 BINS = Path(os.environ.get("BINS_DIR", "/bins")).resolve()
@@ -426,6 +428,14 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json({"error": "not found"}, 404)
             if path == "/api/catalog" and method == "GET":
                 return self.send_json(catalog.catalog())
+            if path == "/api/volume" and method == "GET":
+                out = {}
+                for rel in parse_qs(urlparse(self.path).query).get("f", [])[:60]:
+                    try:
+                        out[rel] = round(volume.of_file(bin_file(rel)), 1)
+                    except (ValueError, OSError):
+                        pass
+                return self.send_json(out)
             if path == "/api/bins" and method == "GET":
                 return self.send_json(bins())
             if path == "/api/uploads" and method == "POST":

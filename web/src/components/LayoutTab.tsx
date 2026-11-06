@@ -5,6 +5,8 @@ import * as THREE from "three";
 import { api, bambuProject, download, fileName, type BinFile, type ParamValue } from "../api";
 import { grid, PITCH, type Grid } from "../lib/grid";
 import { usePlate } from "../lib/usePlate";
+import { fmtGrams, grams, metres, useVolumes } from "../lib/filament";
+import { meshVolume } from "../lib/stl";
 import { canChange, DEFAULT_LAYOUT, loadProject, newId, project, toProject, useStore, value, type Layout, type PartLine, type Placed } from "../store";
 import { FURNITURE } from "../lib/furniture";
 import { DrawerTabs } from "./DrawerTabs";
@@ -467,6 +469,39 @@ export function LayoutTab() {
     color: (d.layout.plateFilament ?? PLATE_DEFAULT)[1],
     label: inScope.length > 1 ? d.name : "",
   }));
+  // filament estimate (solid volume -> grams); the baseplates of other drawers scale with their area from this one's
+  const flexLabelFile = (w: number) => `labels/flex/print-flex-label-${w}_fit${FLEX_FIT}.stl`;
+  const vols = useVolumes([...bom.map((b) => b.file), ...allParts.map((p) => p.file), ...engraved.map((l) => flexLabelFile(l.w))]);
+  const plateVol = useMemo(() => plate.segments.reduce((a, sg) => a + meshVolume(sg.pos), 0), [plate.segments]);
+  const area = (pl: Record<string, ParamValue>) => {
+    const sz = (pl.plate_size as number[] | undefined) ?? size ?? [0, 0];
+    return (sz[0] ?? 0) * (sz[1] ?? 0);
+  };
+  const plateGrams = (d: (typeof inScope)[number]) => {
+    const own = area(layout.plate);
+    if (!plateVol || !own) return 0;
+    return grams((plateVol * area(d.layout.plate)) / own, (d.layout.plateFilament ?? PLATE_DEFAULT)[0]);
+  };
+  const est = (() => {
+    let g = 0, mm3 = 0, missing = 0;
+    const add = (file: string, count: number, filament?: string) => {
+      const v = vols.get(file);
+      if (v === undefined) return void missing++;
+      g += grams(v, filament) * count;
+      mm3 += v * count;
+    };
+    bom.forEach((b) => add(b.file, b.count, b.filament));
+    allParts.forEach((p) => add(p.file, p.count, p.filament[0]));
+    engraved.forEach((l) => add(flexLabelFile(l.w), l.count, labelFilament[0]));
+    const own = area(layout.plate);
+    for (const d of inScope) {
+      if (!plateVol || !own) { missing++; continue; }
+      const v = (plateVol * area(d.layout.plate)) / own;
+      g += grams(v, (d.layout.plateFilament ?? PLATE_DEFAULT)[0]);
+      mm3 += v;
+    }
+    return { g, m: metres(mm3), missing };
+  })(); // cheap; recomputed each render so newly arrived volumes show
   const zipBins = useMemo(() => {
     const m = new Map<string, number>();
     bom.forEach((r) => m.set(r.file, (m.get(r.file) ?? 0) + r.count));
@@ -810,7 +845,10 @@ export function LayoutTab() {
                   <small>{info ? `${t(info.system ?? "")} · ${t(info.kind ?? "")}` : ""}{filament ? ` · ${fn(filament)}` : ""}</small>
                   {labels.length > 0 && <small className="bom-labels">{labels.join(" · ")}</small>}
                 </span>
-                <b>{count}×</b>
+                <b>
+                  {count}×
+                  {vols.has(file) && <small className="bom-g">{fmtGrams(grams(vols.get(file)!, filament) * count)}</small>}
+                </b>
               </div>
             ))}
             {allParts.length > 0 && <div className="bom-sep">{t("Dividers & labels")}</div>}
@@ -836,7 +874,10 @@ export function LayoutTab() {
                 <span className="bom-name">
                   {t("Flex label")} {l.w} · „{l.text}“<small>fit {l.fit} · {fn(labelFilament[0])}</small>
                 </span>
-                <b>{l.count}×</b>
+                <b>
+                  {l.count}×
+                  {vols.has(flexLabelFile(l.w)) && <small className="bom-g">{fmtGrams(grams(vols.get(flexLabelFile(l.w))!, labelFilament[0]) * l.count)}</small>}
+                </b>
               </div>
             ))}
             {scope === "all" ? (
@@ -847,7 +888,7 @@ export function LayoutTab() {
                   <div key={d.id} className="bom-row plate-row">
                     <span className="dot" style={{ background: pf[1] }} />
                     <span className="bom-name">{t("Baseplate")} · {d.name}<small>{sz?.[0]} × {sz?.[1]} mm · {fn(pf[0])}</small></span>
-                    <b>1×</b>
+                    <b>1×{plateGrams(d) > 0 && <small className="bom-g">{fmtGrams(plateGrams(d))}</small>}</b>
                   </div>
                 );
               })
@@ -877,8 +918,19 @@ export function LayoutTab() {
                   </select>
                 </small>
               </span>
-              <b>{plate.segments.length || "–"} {t("pcs")}</b>
+              <b>
+                {plate.segments.length || "–"} {t("pcs")}
+                {plateGrams(inScope[0]) > 0 && <small className="bom-g">{fmtGrams(plateGrams(inScope[0]))}</small>}
+              </b>
             </div>
+            )}
+            {(bom.length > 0 || allParts.length > 0 || plateVol > 0) && (
+              <div className="bom-total" title={t("From the solid volume of each part; infill makes the real amount somewhat lower")}>
+                <span>{t("Filament, about")}</span>
+                <b>
+                  {fmtGrams(est.g)} · {Math.round(est.m)} m{est.missing > 0 && " …"}
+                </b>
+              </div>
             )}
             <div className="row-btns">
               <button className="ghost small" onClick={undo} disabled={!useStore.getState().past.length}>↶ {t("Undo")}</button>
