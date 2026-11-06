@@ -9,6 +9,7 @@ import { fmtGrams, grams, metres, useVolumes } from "../lib/filament";
 import { meshVolume } from "../lib/stl";
 import { fill } from "../lib/fill";
 import { drawerMapHtml } from "../lib/drawerMap";
+import { EXAMPLES, exampleProject } from "../lib/examples";
 import { canChange, DEFAULT_LAYOUT, loadProject, newId, project, toProject, useStore, value, type Layout, type PartLine, type Placed } from "../store";
 import { FURNITURE } from "../lib/furniture";
 import { DrawerTabs } from "./DrawerTabs";
@@ -303,7 +304,8 @@ export function LayoutTab() {
     const b = pl.box.isEmpty() ? new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(g.cellsX * PITCH, g.cellsY * PITCH, 5)) : pl.box.clone();
     return b.expandByPoint(new THREE.Vector3(b.max.x, b.max.y, 60));
   }, [pl.box, g]);
-  const sizeKey = `${size?.[0]}x${size?.[1]}`;
+  // refit when the drawer size changes, and again when the new plate's mesh arrives (its box is then the new size)
+  const sizeKey = `${size?.[0]}x${size?.[1]}|${Math.round(frameBox.max.x - frameBox.min.x)}x${Math.round(frameBox.max.y - frameBox.min.y)}`;
   useEffect(() => {
     const t = setTimeout(() => fitView(controls.current, frameBox, "iso"), 50);
     return () => clearTimeout(t);
@@ -788,6 +790,24 @@ export function LayoutTab() {
         {plate.loading && <div className="spinner" title={t("Rendering the plate…")} />}
         {plate.error && <div className="stage-error">{plate.error}</div>}
         {layout.bins.length === 0 && !armed && <div className="stage-tip">{t("Pick a bin size on the left, then click on the plate")}</div>}
+        {layout.bins.length === 0 && !armed && drawers.length === 1 && (
+          <div className="examples">
+            <span>{t("Or start from an example:")}</span>
+            {EXAMPLES.map((e) => (
+              <button
+                key={e.id}
+                className="ghost small"
+                title={e.blurb[lang === "de" ? 1 : 0]}
+                onClick={() => {
+                  loadProject(exampleProject(e, lang));
+                  set({ layoutPreset: null });
+                }}
+              >
+                {e.name[lang === "de" ? 1 : 0]}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="hud">
           {/* the selected bin's card; greyed out while nothing is selected (2026-11-03) */}
           <div className={`card selected ${sel && selInfo ? "" : "idle"}`}>

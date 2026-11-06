@@ -230,7 +230,7 @@ a.signin { padding: 4px 10px; border: 1px solid var(--line-2); border-radius: 99
   border-radius: 10px; padding: 10px 12px; font-size: 12px; white-space: pre-wrap; max-height: 30%; overflow: auto;
 }
 .stage-tip {
-  position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--glass); backdrop-filter: blur(10px);
+  position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%); background: var(--glass); backdrop-filter: blur(10px);
   border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; color: var(--muted); font-size: 13px; pointer-events: none;
   animation: float 3s ease-in-out infinite;
 }
@@ -372,3 +372,9 @@ a.signin { padding: 4px 10px; border: 1px solid var(--line-2); border-radius: 99
 .bom-total b { font-variant-numeric: tabular-nums; }
 .fill-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
 .fill-row .inline-select { font-size: 12px; }
+.examples {
+  position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: center;
+  background: var(--glass); backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: 999px; padding: 6px 8px 6px 16px;
+  font-size: 13px; color: var(--muted); white-space: nowrap;
+}
+.examples .ghost.small { border-radius: 999px; color: var(--text, inherit); }

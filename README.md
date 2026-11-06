@@ -18,6 +18,8 @@ onto it, and download everything as STL files or as a Bambu Studio project with 
   drawers at once. The print list and the downloads cover one drawer or all of them, with a baseplate per drawer.
 - **Fill gaps** fills every free spot of the drawer with the biggest bin of the chosen type and height that fits
   (up to a size you pick, e.g. 2×2); one undo takes them all back.
+- **Examples**: an empty layout offers two example drawers (screws in an IKEA ALEX, electronics in a HELMER) to start
+  from.
 - **Your own bins**: drop any Gridfinity STL onto the plate (or into the Community section). It is centred, measured
   against the grid and added to the library on the server with your name, for everyone using that installation.
 - **Engraved labels**: every labelled flex bin gets its flex label with the text engraved (sized to fit), in the print
