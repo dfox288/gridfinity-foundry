@@ -446,3 +446,8 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: 11px; padding: 1px 5p
 .layers button { border: 0; background: none; padding: 4px 9px; border-radius: 7px; font-size: 12px; color: var(--muted); min-width: 26px; }
 .layers button.on { background: var(--accent); color: var(--accent-ink); }
 .hint .bad { color: #f97316; font-weight: 600; }
+.popover .preset-group { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 8px 9px 2px; }
+.furniture:has(.baseplate-pick) { flex-wrap: wrap; }
+.baseplate-pick { display: flex; gap: 6px; align-items: center; flex: 1 1 100%; min-width: 0; }
+.baseplate-pick select { flex: 1; min-width: 0; }
+.baseplate-pick .changed { color: var(--accent); font-size: 11px; white-space: nowrap; }

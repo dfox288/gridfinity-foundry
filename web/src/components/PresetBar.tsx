@@ -3,14 +3,23 @@ import { api, type PresetInfo, type PresetKind } from "../api";
 import { useT } from "../lib/i18n";
 import { canChange, useStore } from "../store";
 
-// Saved presets of one kind on the server: pick one to load, save the current state under a name, delete
-export function PresetBar<T>({ kind, current, dirty, onLoad, getData, onNew }: {
+export interface Builtin<T> {
+  name: string;   // shown and kept as the current preset's name
+  sub: string;    // second line, e.g. the size
+  data: T;
+}
+
+// Saved presets of one kind on the server: pick one to load, save the current state under a name, delete.
+// `builtins` (read-only, e.g. furniture drawers) are listed first under `builtinTitle`; saving one saves a copy.
+export function PresetBar<T>({ kind, current, dirty, onLoad, getData, onNew, builtins = [], builtinTitle }: {
   kind: PresetKind;
   current: string | null;
   dirty: boolean;
   onLoad: (name: string, data: T) => void;
   getData: () => T;
   onNew: () => void;
+  builtins?: Builtin<T>[];
+  builtinTitle?: string;
 }) {
   const toast = useStore((s) => s.toast);
   useStore((s) => s.me);   // re-render on sign-in (canChange)
@@ -20,6 +29,7 @@ export function PresetBar<T>({ kind, current, dirty, onLoad, getData, onNew }: {
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const box = useRef<HTMLDivElement>(null);
+  const readOnly = builtins.some((b) => b.name === current);
 
   const refresh = () => api.presets(kind).then(setList).catch((e) => toast(e.message, "error"));
   useEffect(() => {
@@ -53,7 +63,7 @@ export function PresetBar<T>({ kind, current, dirty, onLoad, getData, onNew }: {
         <span className="preset-name">{current ?? t("Unsaved")}{dirty && current ? " •" : ""}</span>
         <span className="caret">▾</span>
       </button>
-      <button className="icon-btn" title={current ? t("Save “{name}”", { name: current }) : t("Save as…")} onClick={() => (current ? save(current) : (setName(""), setSaving(true)))}>
+      <button className="icon-btn" title={current && !readOnly ? t("Save “{name}”", { name: current }) : t("Save as…")} onClick={() => (current && !readOnly ? save(current) : (setName(current ? `${current} copy` : ""), setSaving(true)))}>
         ⤓
       </button>
       <button className="icon-btn" title={t("Save as…")} onClick={() => (setName(current ? `${current} copy` : ""), setSaving(true), setOpen(false))}>
@@ -70,6 +80,16 @@ export function PresetBar<T>({ kind, current, dirty, onLoad, getData, onNew }: {
           <button className="item new" onClick={() => (onNew(), setOpen(false))}>
             {t("✦ New (defaults)")}
           </button>
+          {builtins.length > 0 && <div className="preset-group">{builtinTitle}</div>}
+          {builtins.map((b) => (
+            <div key={b.name} className={`item builtin ${b.name === current ? "on" : ""}`}>
+              <button className="item-main" onClick={() => (onLoad(b.name, b.data), setOpen(false))}>
+                <span>{b.name}</span>
+                <small>{b.sub}</small>
+              </button>
+            </div>
+          ))}
+          {builtins.length > 0 && <div className="preset-group">{t("Saved")}</div>}
           {list.length === 0 && <div className="empty">{t("No presets yet")}</div>}
           {list.map((p) => (
             <div key={p.name} className={`item ${p.name === current ? "on" : ""}`}>

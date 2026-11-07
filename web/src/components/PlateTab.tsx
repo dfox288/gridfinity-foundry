@@ -6,7 +6,9 @@ import { toStl } from "../lib/stl";
 import { usePlate } from "../lib/usePlate";
 import { filamentName } from "../lib/bambu";
 import { useT } from "../lib/i18n";
-import { useStore, value } from "../store";
+import { loadProject, project, useStore, value } from "../store";
+import { FURNITURE } from "../lib/furniture";
+import { furnitureFor, furnitureSub, withFurniture } from "../lib/furniture-presets";
 import { ParamPanel } from "./ParamPanel";
 import { PlateMesh, plateLayout } from "./PlateMesh";
 import { PresetBar } from "./PresetBar";
@@ -16,7 +18,8 @@ import { ViewButtons } from "./ViewButtons";
 
 export function PlateTab() {
   const { schema, plate, platePreset, theme, set, setPlateParam, toast } = useStore();
-  const [saved, setSaved] = useState("{}");
+  const saved = useStore((s) => s.plateSaved);
+  const setSaved = (j: string) => set({ plateSaved: j });
   const [explode, setExplode] = useState(0.35);
   const [colorParts, setColorParts] = useState(true);
   const [labels, setLabels] = useState(true);
@@ -69,9 +72,14 @@ export function PlateTab() {
           current={platePreset}
           dirty={dirty}
           getData={() => plate}
+          builtinTitle={t("Furniture drawers")}
+          builtins={FURNITURE.map((f) => ({ name: t(f.name), sub: `${furnitureSub(f)} · ${t("size only, your options stay")}`, data: { plate_size: [...f.size] } }))}
           onLoad={(name, data) => {
-            set({ plate: data ?? {}, platePreset: name });
-            setSaved(JSON.stringify(data ?? {}));
+            const f = FURNITURE.find((x) => t(x.name) === name);
+            const next = f ? withFurniture(plate, f) : (data ?? {});   // a furniture drawer sets the size only
+            set({ plate: next, platePreset: name });
+            setSaved(JSON.stringify(next));
+            if (f) toast(t("Measure yours: {note}", { note: t(f.note) }));
           }}
           onNew={() => {
             set({ plate: {}, platePreset: null });
@@ -142,8 +150,14 @@ export function PlateTab() {
             <button
               className="ghost"
               onClick={() => {
-                const s = useStore.getState();
-                s.set({ layout: { ...s.layout, plate: { ...plate } }, tab: "layout" });
+                const pr = project();
+                const d = pr.drawers[pr.active];
+                const f = FURNITURE.find((x) => t(x.name) === platePreset) ?? furnitureFor(plate.plate_size);
+                const builtin = FURNITURE.some((x) => t(x.name) === platePreset);
+                pr.drawers[pr.active] = { ...d, furniture: f?.id, plateFrom: platePreset && !builtin && !dirty ? platePreset : undefined,
+                  plateFromData: platePreset && !builtin && !dirty ? JSON.stringify(plate) : undefined, layout: { ...d.layout, plate: { ...plate } } };
+                loadProject(pr);
+                useStore.getState().set({ tab: "layout" });
                 toast(t("Plate settings copied to the layout"));
               }}
             >

@@ -37,6 +37,8 @@ export interface Drawer {
   id: string;
   name: string;
   furniture?: string;
+  plateFrom?: string;       // the saved baseplate preset this drawer's plate was copied from
+  plateFromData?: string;   // that preset's settings as copied (JSON), to show when the drawer was changed since
   layout: Layout;
 }
 
@@ -65,6 +67,7 @@ interface State {
   printer: string;    // Bambu printer preset: bed size and the Bambu project's settings
   plate: Record<string, ParamValue>;
   platePreset: string | null;
+  plateSaved: string;   // the baseplate settings as last loaded or saved (JSON): the tab shows changes since
   layout: Layout;
   layoutPreset: string | null;
   drawers: Drawer[];
@@ -136,6 +139,7 @@ export const useStore = create<State>((set, get) => ({
   printer: savedPrinter ?? "Bambu Lab P1S 0.6 nozzle",
   plate: {},
   platePreset: null,
+  plateSaved: "{}",
   layout: DEFAULT_LAYOUT,
   layoutPreset: null,
   drawers: [{ id: "d1", name: "Drawer 1", layout: DEFAULT_LAYOUT }],

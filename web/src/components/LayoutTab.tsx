@@ -12,6 +12,7 @@ import { drawerMapHtml } from "../lib/drawerMap";
 import { EXAMPLES, exampleProject } from "../lib/examples";
 import { DEFAULT_LAYOUT, loadProject, newId, project, toProject, useStore, value, type PartLine, type Placed } from "../store";
 import { FURNITURE } from "../lib/furniture";
+import { BaseplatePicker } from "./BaseplatePicker";
 import { DrawerTabs } from "./DrawerTabs";
 import { BAMBU, filamentName } from "../lib/bambu";
 import { BinMesh } from "./BinMesh";
@@ -620,24 +621,16 @@ export function LayoutTab() {
         <div className="card drawer">
           <h3>{t("Drawer")}</h3>
           <div className="furniture">
-            <select
-              value={drawers[active]?.furniture ?? ""}
-              onChange={(e) => {
-                const f = FURNITURE.find((x) => x.id === e.target.value);
+            <BaseplatePicker
+              drawer={drawers[active]}
+              plate={layout.plate}
+              onPick={(p) => {
                 const pr = project();
-                pr.drawers[pr.active] = { ...pr.drawers[pr.active], furniture: f?.id };
+                const d = pr.drawers[pr.active];
+                pr.drawers[pr.active] = { ...d, furniture: p.furniture, plateFrom: p.plateFrom, plateFromData: p.plateFromData, layout: { ...d.layout, plate: p.plate } };
                 loadProject(pr);
-                if (f) {
-                  setLayoutPlate("plate_size", f.size);
-                  toast(t("Measure yours: {note}", { note: t(f.note) }));
-                }
               }}
-            >
-              <option value="">{t("Own size")}</option>
-              {FURNITURE.map((f) => (
-                <option key={f.id} value={f.id}>{`${t(f.name)} · ${f.size[0]} × ${f.size[1]}`}</option>
-              ))}
-            </select>
+            />
             {(() => {
               const f = FURNITURE.find((x) => x.id === drawers[active]?.furniture);
               if (!f || f.drawers < 2 || drawers.length >= f.drawers) return null;
@@ -650,7 +643,7 @@ export function LayoutTab() {
                     const short = f.name.replace(/,.*/, "");
                     pr.drawers[pr.active] = { ...cur, name: `${short} 1` };
                     for (let i = pr.drawers.length; i < f.drawers; i++)
-                      pr.drawers.push({ id: newId(), name: `${short} ${i + 1}`, furniture: f.id, layout: { ...DEFAULT_LAYOUT, plate: { ...cur.layout.plate }, plateFilament: cur.layout.plateFilament } });
+                      pr.drawers.push({ id: newId(), name: `${short} ${i + 1}`, furniture: f.id, plateFrom: cur.plateFrom, plateFromData: cur.plateFromData, layout: { ...DEFAULT_LAYOUT, plate: { ...cur.layout.plate }, plateFilament: cur.layout.plateFilament } });
                     loadProject(pr);
                   }}
                 >
@@ -711,12 +704,12 @@ export function LayoutTab() {
             <button
               className="ghost small"
               onClick={() => {
-                const s = useStore.getState();
-                set({ layout: { ...layout, plate: { ...s.plate, plate_size: layout.plate.plate_size ?? s.plate.plate_size } } });
-                toast(t("Baseplate tab settings applied (drawer size kept)"));
+                const d = drawers[active];
+                const f = FURNITURE.find((x) => x.id === d?.furniture);
+                set({ plate: { ...layout.plate }, platePreset: d?.plateFrom ?? (f ? t(f.name) : null), plateSaved: d?.plateFrom ? d.plateFromData ?? "{}" : JSON.stringify(layout.plate), tab: "plate" });
               }}
             >
-              {t("Use baseplate tab settings")}
+              {t("Edit on the Baseplate tab →")}
             </button>
           </div>
         </div>
