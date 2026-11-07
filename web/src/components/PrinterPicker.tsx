@@ -1,5 +1,6 @@
 import { useT } from "../lib/i18n";
 import { useStore } from "../store";
+import { Select } from "./Select";
 
 // The Bambu printer (Bambu Studio's system presets): sets the print bed of the baseplate and of the layout, and is the
 // printer the Bambu project opens with
@@ -9,12 +10,13 @@ export function PrinterPicker() {
   if (!printers.length) return null;
   const models = [...new Set(printers.map((p) => p.model))];
   return (
-    <label className="printer">
+    <div className="printer">
       <span>{t("Printer")}</span>
-      <select
+      <Select
+        ariaLabel={t("Printer")}
         value={printer}
-        onChange={(e) => {
-          const p = printers.find((x) => x.id === e.target.value);
+        onChange={(id) => {
+          const p = printers.find((x) => x.id === id);
           if (!p) return;
           set({ printer: p.id });
           try {
@@ -25,19 +27,16 @@ export function PrinterPicker() {
           setPlateParam("bed_size", p.bed);
           setLayoutPlate("bed_size", p.bed);
         }}
-      >
-        {models.map((m) => (
-          <optgroup key={m} label={m.replace("Bambu Lab ", "")}>
-            {printers
-              .filter((p) => p.model === m)
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {`${m.replace("Bambu Lab ", "")} · ${p.nozzle} mm · ${p.bed[0]} × ${p.bed[1]}${p.extruders > 1 ? " · 2 " + t("nozzles") : ""}`}
-                </option>
-              ))}
-          </optgroup>
-        ))}
-      </select>
-    </label>
+        options={models.flatMap((m) =>
+          printers
+            .filter((p) => p.model === m)
+            .map((p) => ({
+              value: p.id,
+              group: m.replace("Bambu Lab ", ""),
+              label: `${m.replace("Bambu Lab ", "")} · ${p.nozzle} mm · ${p.bed[0]} × ${p.bed[1]}${p.extruders > 1 ? " · 2 " + t("nozzles") : ""}`,
+            })),
+        )}
+      />
+    </div>
   );
 }

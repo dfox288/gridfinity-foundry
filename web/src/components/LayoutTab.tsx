@@ -14,7 +14,8 @@ import { DEFAULT_LAYOUT, loadProject, newId, project, toProject, useStore, value
 import { FURNITURE } from "../lib/furniture";
 import { BaseplatePicker } from "./BaseplatePicker";
 import { DrawerTabs } from "./DrawerTabs";
-import { BAMBU, filamentName } from "../lib/bambu";
+import { BAMBU, filamentName, filamentOptions } from "../lib/bambu";
+import { Select } from "./Select";
 import { BinMesh } from "./BinMesh";
 import { ParamPanel } from "./ParamPanel";
 import { PlateMesh, plateLayout } from "./PlateMesh";
@@ -1050,11 +1051,7 @@ export function LayoutTab() {
               }}
             />
             <div className="filament-row">
-              <select value={material} disabled={!sel} onChange={(e) => setMaterial(e.target.value)}>
-                {Object.keys(BAMBU).map((m) => (
-                  <option key={m}>{m}</option>
-                ))}
-              </select>
+              <Select value={material} disabled={!sel} ariaLabel={t("Material")} onChange={setMaterial} options={Object.keys(BAMBU).map((m) => ({ value: m, label: m }))} />
               <span className="filament-name">{sel && selInfo ? fn(binColor(sel, selInfo, layout.colorMode)[1]) || "–" : ""}</span>
             </div>
             <div className="swatches">
@@ -1170,23 +1167,17 @@ export function LayoutTab() {
                 {t("Baseplate")}
                 <small>
                   {size?.[0]} × {size?.[1]} mm ·{" "}
-                  <select
+                  <Select
                     className="inline-select"
+                    ariaLabel={t("Filament")}
                     value={(layout.plateFilament ?? PLATE_DEFAULT)[0]}
-                    onChange={(e) => {
-                      const [mat, name] = e.target.value.split(" · ");
+                    options={filamentOptions(lang)}
+                    onChange={(v) => {
+                      const [mat, name] = v.split(" · ");
                       const hit = BAMBU[mat]?.find((c) => c[0] === name);
-                      if (hit) set({ layout: { ...layout, plateFilament: [e.target.value, hit[1]] } });
+                      if (hit) set({ layout: { ...layout, plateFilament: [v, hit[1]] } });
                     }}
-                  >
-                    {Object.entries(BAMBU).map(([mat, cs]) => (
-                      <optgroup key={mat} label={mat}>
-                        {cs.map(([name]) => (
-                          <option key={name} value={`${mat} · ${name}`}>{fn(`${mat} · ${name}`)}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
+                  />
                 </small>
               </span>
               <b>

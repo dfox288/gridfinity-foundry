@@ -5,6 +5,7 @@ import { download } from "../api";
 import { useT } from "../lib/i18n";
 import { inventoryTemplate, parseInventory, type InvRow } from "../lib/inventory";
 import { useStore } from "../store";
+import { Select } from "./Select";
 
 export function Inventory({ onPlace, onNewDrawer }: { onPlace: (rows: InvRow[]) => InvRow[]; onNewDrawer: (rows: InvRow[]) => InvRow[] }) {
   const t = useT();
@@ -59,15 +60,15 @@ export function Inventory({ onPlace, onNewDrawer }: { onPlace: (rows: InvRow[]) 
                     <input value={r.item} maxLength={40} onChange={(e) => edit(i, { item: e.target.value })} title={r.count ? `${r.count}×` : undefined} />
                   </td>
                   <td>
-                    <select value={`${r.w}x${r.d}`} onChange={(e) => { const [w, d] = e.target.value.split("x").map(Number); edit(i, { w, d }); }}>
-                      {!sizes.includes(`${r.w}x${r.d}`) && <option value={`${r.w}x${r.d}`}>{`${r.w}×${r.d} ?`}</option>}
-                      {sizes.map((s) => <option key={s} value={s}>{s.replace("x", "×")}</option>)}
-                    </select>
+                    <Select
+                      ariaLabel={t("Size")}
+                      value={`${r.w}x${r.d}`}
+                      onChange={(v) => { const [w, d] = v.split("x").map(Number); edit(i, { w, d }); }}
+                      options={[...(sizes.includes(`${r.w}x${r.d}`) ? [] : [{ value: `${r.w}x${r.d}`, label: `${r.w}×${r.d} ?` }]), ...sizes.map((s) => ({ value: s, label: s.replace("x", "×") }))]}
+                    />
                   </td>
                   <td>
-                    <select value={r.h} onChange={(e) => edit(i, { h: +e.target.value })}>
-                      {heights.map((h) => <option key={h} value={h}>{h}U</option>)}
-                    </select>
+                    <Select ariaLabel={t("Height")} value={String(r.h)} onChange={(v) => edit(i, { h: +v })} options={heights.map((h) => ({ value: String(h), label: `${h}U` }))} />
                   </td>
                   <td>
                     <button className="icon-x" title={t("Remove")} onClick={() => setRows((rs) => (rs && rs.length > 1 ? rs.filter((_, j) => j !== i) : null))}>×</button>

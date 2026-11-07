@@ -7,6 +7,7 @@ import { canChange, useStore } from "../store";
 import { useT } from "../lib/i18n";
 import { creatorName, uploadBins } from "../lib/upload";
 import { HeightPicker } from "./HeightPicker";
+import { Select } from "./Select";
 
 export function Library({ armed, onArm, onFill, maxU }: { armed: string | null; onArm: (f: string | null) => void; onFill: (bins: BinFile[], max: [number, number]) => void; maxU?: number }) {
   const bins = useStore((s) => s.bins);
@@ -152,11 +153,7 @@ export function Library({ armed, onArm, onFill, maxU }: { armed: string | null; 
           <button className="ghost small" disabled={!list.length} onClick={() => onFill(list, fillMax.split("x").map(Number) as [number, number])} title={t("Fills every free spot with the biggest of these bins that fits; one undo takes it back")}>
             {t("Fill gaps")}
           </button>
-          <select className="inline-select" value={fillMax} onChange={(e) => setFillMax(e.target.value)}>
-            {["1x1", "2x1", "2x2", "3x2", "3x3", "6x6"].map((a) => (
-              <option key={a} value={a}>{t("up to {size}", { size: a.replace("x", "×") })}</option>
-            ))}
-          </select>
+          <Select className="inline-select" value={fillMax} onChange={setFillMax} options={["1x1", "2x1", "2x2", "3x2", "3x3", "6x6"].map((a) => ({ value: a, label: t("up to {size}", { size: a.replace("x", "×") }) }))} />
         </div>
       )}
       <p className="hint">{t("Click a size, then click on the plate (or drag it there). R turns (also while dragging), F or a double-click zooms in, Shift-click selects more, ⌘A all, Del removes, arrows move, ⌘Z undoes.")}</p>

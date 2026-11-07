@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openLayout, state } from "./helpers";
+import { choose, openLayout, state } from "./helpers";
 
 // a saved baseplate preset, served by a mocked API (nothing is written to the server)
 const SAVED = { name: "Thin magnets", data: { plate_size: [300, 400], magnets: true } };
@@ -24,16 +24,15 @@ test("furniture drawers are built-in baseplate presets that set the size only", 
 
 test("a layout drawer picks its baseplate: furniture or a saved preset, copied", async ({ page }) => {
   await openLayout(page);
-  const pick = page.locator(".drawer .baseplate-pick select");
-  await pick.selectOption("f:ikea-alex-9");
+  const pick = page.locator(".drawer .baseplate-pick .combo");
+  await choose(page, pick, "alex 9");
   expect(await state(page, "s.layout.plate.plate_size")).toEqual([295, 423]);
   expect(await state(page, "s.drawers[s.active].furniture")).toBe("ikea-alex-9");
   await expect(page.locator(".baseplate-pick .changed")).toHaveCount(0);
   await page.locator(".drawer .drawer-row input").first().fill("290");
   await expect(page.locator(".baseplate-pick .changed")).toBeVisible();
 
-  await pick.focus();
-  await pick.selectOption(`p:${SAVED.name}`);
+  await choose(page, pick, "thin magnets");
   await expect.poll(() => state(page, "s.layout.plate")).toEqual(SAVED.data);
   expect(await state(page, "s.drawers[s.active].plateFrom")).toBe(SAVED.name);
   await expect(page.locator(".baseplate-pick .changed")).toHaveCount(0);

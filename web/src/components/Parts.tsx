@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { BinFile } from "../api";
-import { BAMBU, filamentName } from "../lib/bambu";
+import { BAMBU, filamentOptions } from "../lib/bambu";
+import { Select } from "./Select";
 import { translate, useT } from "../lib/i18n";
 import { HeightPicker } from "./HeightPicker";
 import { useStore } from "../store";
@@ -36,11 +37,7 @@ export function PartsLibrary({ parts, onAdd }: { parts: BinFile[]; onAdd: (file:
   return (
     <div className="library">
       <div className="lib-filters">
-        <select className="part-cat" value={cat} onChange={(e) => setCat(e.target.value)}>
-          {cats.map((c) => (
-            <option key={c} value={c}>{t(c)}</option>
-          ))}
-        </select>
+        <Select className="part-cat" ariaLabel={t("Parts")} value={cat} onChange={setCat} options={cats.map((c) => ({ value: c, label: t(c) }))} />
         {tall && (
           <HeightPicker value={h} onChange={setH} toggle />
         )}
@@ -70,23 +67,17 @@ export function PartRows({ lines, lib, onChange }: { lines: PartLine[]; lib: Map
           <span className="bom-name">
             {partName(lib.get(l.file), l.file)}
             <small>
-              <select
+              <Select
                 className="inline-select"
+                ariaLabel={translate(lang, "Filament")}
                 value={l.filament[0]}
-                onChange={(e) => {
-                  const [mat, name] = e.target.value.split(" · ");
+                options={filamentOptions(lang)}
+                onChange={(v) => {
+                  const [mat, name] = v.split(" · ");
                   const hit = BAMBU[mat]?.find((c) => c[0] === name);
-                  if (hit) onChange(lines.map((x, j) => (j === i ? { ...x, filament: [e.target.value, hit[1]] } : x)));
+                  if (hit) onChange(lines.map((x, j) => (j === i ? { ...x, filament: [v, hit[1]] } : x)));
                 }}
-              >
-                {Object.entries(BAMBU).map(([mat, cs]) => (
-                  <optgroup key={mat} label={mat}>
-                    {cs.map(([name]) => (
-                      <option key={name} value={`${mat} · ${name}`}>{filamentName(`${mat} · ${name}`, lang)}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+              />
             </small>
           </span>
           <span className="stepper">

@@ -65,3 +65,11 @@ export async function clickAt(page: Page, [x, y]: [number, number], button: "lef
   await page.mouse.down({ button });
   await page.mouse.up({ button });
 }
+
+// pick in a searchable select (components/Select.tsx): open it, type, Enter takes the first match
+export async function choose(page: Page, combo: import("@playwright/test").Locator, search: string) {
+  await combo.click();
+  await page.locator(".combo-pop .combo-search").fill(search);
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".combo-pop")).toHaveCount(0);
+}

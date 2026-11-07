@@ -105,3 +105,7 @@ export function filamentName(s: string, lang: "en" | "de") {
   const hit = BAMBU[mat]?.find((c) => c[0] === name);
   return hit ? `${mat} · ${hit[3]}` : s;
 }
+
+// every colour as an option of a searchable select: value "PLA Basic · Gray", grouped by material, with its colour
+export const filamentOptions = (lang: "en" | "de") =>
+  Object.entries(BAMBU).flatMap(([mat, cs]) => cs.map(([name, hex]) => ({ value: `${mat} · ${name}`, label: filamentName(`${mat} · ${name}`, lang), group: mat, swatch: hex })));

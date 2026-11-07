@@ -4,6 +4,7 @@ import { FURNITURE } from "../lib/furniture";
 import { furnitureFor, furnitureSub, withFurniture } from "../lib/furniture-presets";
 import { useT } from "../lib/i18n";
 import { useStore, type Drawer } from "../store";
+import { Select } from "./Select";
 
 export interface PlatePick {
   plate: Record<string, ParamValue>;
@@ -45,22 +46,19 @@ export function BaseplatePicker({ drawer, plate, onPick }: { drawer?: Drawer; pl
 
   return (
     <div className="baseplate-pick">
-      <select aria-label={t("Baseplate")} value={value} onFocus={refresh} onChange={(e) => pick(e.target.value)}>
-        <option value="">{t("Own size")}</option>
-        <optgroup label={t("Furniture drawers")}>
-          {FURNITURE.map((g) => (
-            <option key={g.id} value={`f:${g.id}`}>{`${t(g.name)} · ${furnitureSub(g)}`}</option>
-          ))}
-        </optgroup>
-        {saved.length > 0 && (
-          <optgroup label={t("Saved baseplates")}>
-            {saved.map((p) => (
-              <option key={p.name} value={`p:${p.name}`}>{p.name}</option>
-            ))}
-          </optgroup>
-        )}
-        {drawer?.plateFrom && !saved.some((p) => p.name === drawer.plateFrom) && <option value={`p:${drawer.plateFrom}`}>{drawer.plateFrom}</option>}
-      </select>
+      <Select
+        ariaLabel={t("Baseplate")}
+        value={value}
+        onOpen={refresh}
+        threshold={0}   // the saved presets grow: always searchable
+        onChange={pick}
+        options={[
+          { value: "", label: t("Own size") },
+          ...FURNITURE.map((g) => ({ value: `f:${g.id}`, label: `${t(g.name)} · ${furnitureSub(g)}`, group: t("Furniture drawers") })),
+          ...saved.map((p) => ({ value: `p:${p.name}`, label: p.name, group: t("Saved baseplates") })),
+          ...(drawer?.plateFrom && !saved.some((p) => p.name === drawer.plateFrom) ? [{ value: `p:${drawer.plateFrom}`, label: drawer.plateFrom, group: t("Saved baseplates") }] : []),
+        ]}
+      />
       {changed && <small className="changed" title={t("Changed in this drawer since it was picked")}>{t("changed")}</small>}
     </div>
   );

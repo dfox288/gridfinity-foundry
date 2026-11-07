@@ -1,5 +1,6 @@
 import { useT } from "../lib/i18n";
 import { useStore } from "../store";
+import { Select } from "./Select";
 
 const QUICK = [3, 6, 9];
 
@@ -22,17 +23,14 @@ export function HeightPicker({ value, onChange, toggle = false, maxU }: { value:
         </button>
       ))}
       {more.length > 0 && (
-        <select
+        <Select
           className={`seg-select ${value !== null && more.includes(value) ? "on" : ""}`}
-          value={value !== null && more.includes(value) ? value : ""}
-          onChange={(e) => onChange(Number(e.target.value))}
+          value={value !== null && more.includes(value) ? String(value) : ""}
+          placeholder={t("more")}
+          onChange={(v) => onChange(Number(v))}
           title={t("Taller bins are made when first needed (about a second each)")}
-        >
-          <option value="" disabled>{t("more")}</option>
-          {more.map((x) => (
-            <option key={x} value={x}>{maxU !== undefined && x > maxU ? `${x}U ✕` : `${x}U`}</option>
-          ))}
-        </select>
+          options={more.map((x) => ({ value: String(x), label: maxU !== undefined && x > maxU ? `${x}U ✕` : `${x}U` }))}
+        />
       )}
     </div>
   );

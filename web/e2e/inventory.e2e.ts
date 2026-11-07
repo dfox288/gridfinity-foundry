@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openLayout, state } from "./helpers";
+import { choose, openLayout, state } from "./helpers";
 
 test.beforeEach(async ({ page }) => openLayout(page));
 
@@ -10,9 +10,10 @@ test("a pasted list becomes labelled bins in the drawer, one undo takes them bac
   await c.locator("textarea").fill("M3 screws 200\nM4 nuts\nPliers\nUSB cables\nSoldering iron 25 cm");
   await c.getByRole("button", { name: "Suggest bins" }).click();
   await expect(c.locator(".inv-table tr")).toHaveCount(5);
-  await expect(c.locator(".inv-table tr").nth(0).locator("select").first()).toHaveValue("2x1");   // 200 screws: a bigger bin
-  await expect(c.locator(".inv-table tr").nth(2).locator("select").first()).toHaveValue("4x1");   // pliers: long
-  await c.locator(".inv-table tr").nth(1).locator("select").first().selectOption("2x1");          // change a guess
+  const size = (i: number) => c.locator(".inv-table tr").nth(i).locator(".combo").first();   // searchable: many sizes
+  await expect(size(0)).toHaveAttribute("data-value", "2x1");   // 200 screws: a bigger bin
+  await expect(size(2)).toHaveAttribute("data-value", "4x1");   // pliers: long
+  await choose(page, size(1), "2×1");                           // change a guess
   await c.getByRole("button", { name: /Place 5 bins/ }).click();
   const labels = await state<string[]>(page, "s.layout.bins.map(b => b.label).sort()");
   expect(labels).toEqual(["M3 screws", "M4 nuts", "Pliers", "Soldering iron 25 cm", "USB cables"]);

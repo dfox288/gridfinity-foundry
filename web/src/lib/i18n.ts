@@ -117,6 +117,10 @@ const DE: Record<string, string> = {
   "Saved “{name}”": "„{name}“ gespeichert",
   // parameters
   "Search options…": "Optionen suchen…",
+  "Search…": "Suchen…",
+  Size: "Größe",
+  Height: "Höhe",
+  Parts: "Teile",
   "{n} changed": "{n} geändert",
   "Show changed options only": "Nur geänderte Optionen zeigen",
   "Plate & printer": "Platte & Drucker",

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { Param, ParamValue } from "../api";
 import { GF_DE, GF_GROUPS_DE, GF_OPTIONS_DE, useT } from "../lib/i18n";
 import { useStore } from "../store";
+import { Select } from "./Select";
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const pretty = (s: string) => s.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
@@ -47,13 +48,7 @@ function Field({ p, value, onChange }: { p: Param; value: ParamValue; onChange: 
         </div>
       );
     return (
-      <select value={String(value)} onChange={(e) => onChange(typeof p.initial === "number" ? +e.target.value : e.target.value)}>
-        {p.options.map((o) => (
-          <option key={String(o.value)} value={String(o.value)}>
-            {opt(o.name)}
-          </option>
-        ))}
-      </select>
+      <Select value={String(value)} onChange={(v) => onChange(typeof p.initial === "number" ? +v : v)} options={p.options.map((o) => ({ value: String(o.value), label: opt(o.name) }))} />
     );
   }
   if (p.type === "string") return <input className="text" value={String(value)} onChange={(e) => onChange(e.target.value)} />;
